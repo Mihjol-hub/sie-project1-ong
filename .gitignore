@@ -1,0 +1,24 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+.venv/
+venv/
+ENV/
+env/
+
+# Instance folder (si usáramos config ahí)
+/instance/
+
+# Docker caches, volumes (generalmente no se suben datos)
+# ¡CUIDADO! Si quieres subir addons de odoo, NO ignores todo aquí.
+# odoo_data/
+# postgres_data/
+
+# Archivos específicos de IDEs
+.vscode/
+.idea/
+*.DS_Store

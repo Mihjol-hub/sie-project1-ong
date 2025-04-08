@@ -1,0 +1,35 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Usamos la variable pasada desde Flask -->
+    <title>{{ page_title }}</title>
+    <!-- Puedes añadir un enlace a CSS en static/ si quieres más adelante -->
+    <!-- <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"> -->
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        h1 { color: #333; }
+        p { color: #555;}
+        .container { max-width: 800px; margin: auto; background-color: #f9f9f9; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);}
+    </style>
+</head>
+<body>
+    <!-- templates/index.html -->
+    <div class="container">
+        <h1>¡Bienvenido!</h1>
+        <p>La aplicación Flask está funcionando dentro de Docker en GitHub Codespaces.</p>
+        <p>El siguiente paso es configurar Odoo y empezar a interactuar con él.</p>
+        <p><b>Estado conexión Odoo:</b> {{ odoo_connection_status }}</p> <!-- MOSTRAR ESTADO -->
+        <p><a href="/api/odoo_version">Probar obtener versión Odoo</a></p> <!-- ENLACE NUEVO -->
+        <p><a href="/api/hello">Probar endpoint API simple</a></p>
+        <hr>
+            <hr>
+            <p><a href="{{ url_for('books.list_books') }}">Ver Libros Registrados</a></p>  <!-- ENLACE PARA VER LISTA -->
+            <p><a href="{{ url_for('books.add_book_form') }}">Registrar un Nuevo Libro Donado</a></p> <!-- ENLACE PARA AÑADIR (Solo uno) -->
+        </div>
+    </body>
+    </html>
+
+

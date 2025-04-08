@@ -1,0 +1,55 @@
+<!-- ong_app/templates/add_book.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Añadir Libro Donado</title>
+    <style>
+        /* (Mismos estilos que index.html para consistencia) */
+        body { font-family: sans-serif; padding: 20px; }
+        .container { max-width: 600px; margin: auto; background-color: #f9f9f9; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);}
+        label { display: block; margin-bottom: 5px; font-weight: bold;}
+        input[type="text"] { width: 100%; padding: 8px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { background-color: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        .flash-message { padding: 10px; margin-bottom: 15px; border-radius: 4px; }
+        .flash-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .flash-error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        a { color: #007bff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Registrar Nuevo Libro Donado</h1>
+
+        <!-- Mostrar mensajes flash (éxito/error) -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form action="{{ url_for('books.add_book_submit') }}" method="post"> <!-- Usar url_for aquí también es buena idea -->
+            <div>
+                <label for="title">Título:</label>
+                <input type="text" id="title" name="title" required>
+            </div>
+            <div>
+                <label for="author">Autor:</label>
+                <input type="text" id="author" name="author"> <!-- No lo haremos required por ahora -->
+            </div>
+            <div>
+                <label for="isbn">ISBN:</label>
+                <input type="text" id="isbn" name="isbn"> <!-- No lo haremos required por ahora -->
+            </div>
+            <button type="submit">Añadir Libro</button>
+        </form>
+        <hr>
+         <p><a href="{{ url_for('main.index') }}">Volver a Inicio</a></p> <!-- Usar url_for aquí también -->
+    </div>
+</body>
+</html>
