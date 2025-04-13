@@ -1,0 +1,78 @@
+<!-- ong_app/templates/list_donors.html -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Listado de Donantes/Contactos</title>
+    <style>
+        /* Mismos estilos que list_books */
+        body { font-family: sans-serif; padding: 20px; }
+        .container { max-width: 900px; margin: auto; background-color: #f9f9f9; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);}
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        .flash-message { padding: 10px; margin-bottom: 15px; border-radius: 4px; }
+        .flash-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .flash-error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .flash-info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        a { color: #007bff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .no-items { font-style: italic; color: #666; }
+        .error-msg { color: #721c24; font-weight: bold; margin-bottom: 15px;}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Listado de Donantes/Contactos en Odoo</h1>
+
+        <!-- Mensajes Flash -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Mensaje de Error Carga -->
+        {% if error_message %}
+            <p class="error-msg">Error al cargar la lista: {{ error_message }}</p>
+        {% endif %}
+
+        <!-- Tabla de Donantes -->
+        {% if donors %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID Odoo</th>
+                        <th>Nombre</th>
+                        <th>Email</th>
+                        <th>Teléfono</th>
+                        <!-- Podríamos añadir más (Notas, Etiquetas) -->
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for donor in donors %}
+                    <tr>
+                        <td>{{ donor.id }}</td>
+                        <td>{{ donor.name }}</td>
+                        <td>{{ donor.email if donor.email else '-' }}</td>
+                        <td>{{ donor.phone if donor.phone else '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% elif not error_message %}
+             <p class="no-items">No hay donantes/contactos para mostrar.</p>
+        {% endif %}
+
+        <hr>
+        <p>
+            <a href="{{ url_for('donors.add_donor_form') }}">Registrar Nuevo Donante</a> |
+            <a href="{{ url_for('main.index') }}">Volver a Inicio</a>
+        </p>
+    </div>
+</body>
+</html>

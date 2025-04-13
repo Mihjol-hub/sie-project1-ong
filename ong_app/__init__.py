@@ -6,6 +6,8 @@ import logging
 # Importar los blueprints desde los otros archivos
 from .routes_main import main_bp
 from .routes_books import books_bp
+from .routes_donors import donors_bp # Importamos el blueprint de donantes
+
 # (Añadiremos más imports aquí si creamos más blueprints)
 
 def create_app(test_config=None):
@@ -37,8 +39,14 @@ def create_app(test_config=None):
         logging.info(">>> main_bp registrado con éxito.")
 
         logging.info("Intentando registrar books_bp...")
-        app.register_blueprint(books_bp) # Registramos el blueprint de libros
+        app.register_blueprint(books_bp) 
         logging.info(">>> books_bp registrado con éxito.")
+        
+        logging.info("Intentando registrar donors_bp...")
+        app.register_blueprint(donors_bp) # Registramos el blueprint de donantes
+        logging.info(">>> donors_bp registrado con éxito.")
+    
+    
     except Exception as e:
         # Si algo falla aquí, es CRÍTICO saberlo
         logging.error(f"¡¡¡ERROR FATAL AL REGISTRAR BLUEPRINT!!!: {e}", exc_info=True)
