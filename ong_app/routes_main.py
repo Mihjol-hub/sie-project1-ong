@@ -1,5 +1,5 @@
 # ong_app/routes_main.py
-from flask import Blueprint, render_template, jsonify
+from flask import Blueprint, render_template, jsonify, redirect, url_for
 from .odoo_connector import get_odoo_client # Importa la función de conexión
 import logging
 import odoorpc # Importamos para manejar sus excepciones específicas
@@ -44,3 +44,138 @@ def odoo_version_test():
 @main_bp.route('/api/hello')
 def api_hello():
     return jsonify({"message": "Hola desde el Blueprint Principal!"})
+
+# Añadir una ruta para buscar el ID de la etiqueta
+
+# BORRA la función find_tag_id y PEGA ESTA en su lugar:
+@main_bp.route('/list_all_tags') 
+def list_all_tags():
+    # BORRA TODO el código que estaba aquí dentro (conexión a odoo, búsqueda, etc.)
+    # Y pon SOLO esta línea:
+    return "Ruta de prueba /list_all_tags funciona!" 
+
+
+# --- DEFINIR LOS IDs REALES DE LAS ETIQUETAS ---
+# !!! MUY IMPORTANTE: REEMPLAZA ESTOS VALORES CON LOS IDs REALES DE TUS ETIQUETAS EN ODOO !!!
+# Puedes usar el script find_tag_ids.py que creamos para obtenerlos ejecutando:
+# docker compose exec flask_app python find_tag_ids.py
+TAG_ID_PENDIENTE = 5 # El ID que CREEMOS que es 'Donado: Pendiente Revisión' (¡VERIFICAR!)
+TAG_ID_APROBADO  = 1 # Reemplazar con el ID REAL de 'Donado: Aprobado'
+TAG_ID_RECHAZADO = 2 # Reemplazar con el ID REAL de 'Donado: Rechazado'
+# -------------------------------------------------
+
+books_bp = Blueprint('books', __name__) # Si no estaba definido ya
+
+# ... (tus rutas existentes: add_book_form, add_book_submit, list_books, review_books) ...
+
+
+# --- NUEVA RUTA PARA APROBAR UN LIBRO (POST) ---
+@books_bp.route('/approve_book/<int:book_id>', methods=['POST'])
+def approve_book(book_id):
+    logging.info(f"[books_bp] Solicitud POST para APROBAR libro con ID de Producto: {book_id}")
+
+    # Validar que los IDs de etiquetas están configurados (son diferentes de -1)
+    if TAG_ID_PENDIENTE <= 0 or TAG_ID_APROBADO <= 0:
+         flash('Error de configuración: IDs de etiquetas Pendiente/Aprobado no configurados correctamente en el código.', 'error')
+         logging.error("[books_bp approve] Error: IDs de etiquetas Pendiente/Aprobado no configurados.")
+         return redirect(url_for('books.review_books'))
+
+    client = get_odoo_client()
+    if not client:
+        flash('Error de conexión con Odoo. No se pudo aprobar el libro.', 'error')
+        return redirect(url_for('books.review_books'))
+
+    try:
+        # 1. Obtener el ID del Template asociado al Product ID
+        product_info = client.env['product.product'].read(book_id, ['product_tmpl_id', 'name'])
+        if not product_info or not product_info[0]['product_tmpl_id']:
+            flash(f'Error: No se pudo encontrar el template para el producto ID={book_id}.', 'error')
+            logging.error(f"[books_bp approve] No se pudo encontrar el template para product.product ID={book_id}.")
+            return redirect(url_for('books.review_books'))
+
+        template_id = product_info[0]['product_tmpl_id'][0]
+        book_name = product_info[0].get('name', f'ID {book_id}') # Obtener nombre para el mensaje
+        logging.info(f"[books_bp approve] Producto ID={book_id} (Nombre: '{book_name}') tiene Template ID={template_id}.")
+
+        # 2. Preparar datos para actualizar etiquetas en el TEMPLATE:
+        #    - Quitar etiqueta "Pendiente" (3)
+        #    - Añadir etiqueta "Aprobado"   (4)
+        update_data = {
+            'product_tag_ids': [
+                (3, TAG_ID_PENDIENTE),
+                (4, TAG_ID_APROBADO)
+            ]
+        }
+        logging.info(f"[books_bp approve] Intentando write en product.template ID={template_id} con datos: {update_data}")
+
+        # 3. Ejecutar el write en el product.template
+        client.env['product.template'].write([template_id], update_data)
+
+        logging.info(f"[books_bp approve] ¡Libro '{book_name}' (Template ID: {template_id}) aprobado exitosamente!")
+        flash(f'Libro "{book_name}" aprobado con éxito.', 'success')
+
+    except odoorpc.error.RPCError as e:
+        logging.error(f"[books_bp approve] Error RPC al aprobar libro (Prod ID: {book_id}, Tmpl ID: {template_id if 'template_id' in locals() else 'N/A'}): {e}", exc_info=True)
+        flash(f'Error RPC al comunicar con Odoo al aprobar: {e}', 'error')
+    except Exception as e:
+        logging.error(f"[books_bp approve] Error inesperado al aprobar libro (Prod ID: {book_id}): {e}", exc_info=True)
+        flash(f'Error inesperado en el servidor al aprobar: {e}', 'error')
+
+    # Redirigir siempre de vuelta a la lista de revisión
+    return redirect(url_for('books.review_books'))
+
+
+# --- NUEVA RUTA PARA RECHAZAR UN LIBRO (POST) ---
+@books_bp.route('/reject_book/<int:book_id>', methods=['POST'])
+def reject_book(book_id):
+    logging.info(f"[books_bp] Solicitud POST para RECHAZAR libro con ID de Producto: {book_id}")
+
+    # Validar que los IDs de etiquetas están configurados
+    if TAG_ID_PENDIENTE <= 0 or TAG_ID_RECHAZADO <= 0:
+         flash('Error de configuración: IDs de etiquetas Pendiente/Rechazado no configurados correctamente en el código.', 'error')
+         logging.error("[books_bp reject] Error: IDs de etiquetas Pendiente/Rechazado no configurados.")
+         return redirect(url_for('books.review_books'))
+
+    client = get_odoo_client()
+    if not client:
+        flash('Error de conexión con Odoo. No se pudo rechazar el libro.', 'error')
+        return redirect(url_for('books.review_books'))
+
+    try:
+        # 1. Obtener el ID del Template asociado al Product ID
+        product_info = client.env['product.product'].read(book_id, ['product_tmpl_id', 'name'])
+        if not product_info or not product_info[0]['product_tmpl_id']:
+            flash(f'Error: No se pudo encontrar el template para el producto ID={book_id}.', 'error')
+            logging.error(f"[books_bp reject] No se pudo encontrar el template para product.product ID={book_id}.")
+            return redirect(url_for('books.review_books'))
+
+        template_id = product_info[0]['product_tmpl_id'][0]
+        book_name = product_info[0].get('name', f'ID {book_id}') # Obtener nombre para el mensaje
+        logging.info(f"[books_bp reject] Producto ID={book_id} (Nombre: '{book_name}') tiene Template ID={template_id}.")
+
+        # 2. Preparar datos para actualizar etiquetas en el TEMPLATE:
+        #    - Quitar etiqueta "Pendiente" (3)
+        #    - Añadir etiqueta "Rechazado"   (4)
+        update_data = {
+            'product_tag_ids': [
+                (3, TAG_ID_PENDIENTE),
+                (4, TAG_ID_RECHAZADO)
+            ]
+        }
+        logging.info(f"[books_bp reject] Intentando write en product.template ID={template_id} con datos: {update_data}")
+
+        # 3. Ejecutar el write en el product.template
+        client.env['product.template'].write([template_id], update_data)
+
+        logging.info(f"[books_bp reject] ¡Libro '{book_name}' (Template ID: {template_id}) rechazado exitosamente!")
+        flash(f'Libro "{book_name}" rechazado con éxito.', 'success')
+
+    except odoorpc.error.RPCError as e:
+        logging.error(f"[books_bp reject] Error RPC al rechazar libro (Prod ID: {book_id}, Tmpl ID: {template_id if 'template_id' in locals() else 'N/A'}): {e}", exc_info=True)
+        flash(f'Error RPC al comunicar con Odoo al rechazar: {e}', 'error')
+    except Exception as e:
+        logging.error(f"[books_bp reject] Error inesperado al rechazar libro (Prod ID: {book_id}): {e}", exc_info=True)
+        flash(f'Error inesperado en el servidor al rechazar: {e}', 'error')
+
+    # Redirigir siempre de vuelta a la lista de revisión
+    return redirect(url_for('books.review_books'))
