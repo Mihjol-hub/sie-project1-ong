@@ -2,76 +2,76 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Añadir Donación Monetaria - ONG</title>
-    <!-- Enlace a tu archivo CSS existente -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Título Más Específico -->
+    <title>Registrar Donación Monetaria - ONG</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <div class="container"> <!-- Usa tu clase contenedora principal si es diferente -->
+    <div class="container">
+        <!-- Usamos H1 consistente -->
         <h1>Registrar Nueva Donación Monetaria</h1>
 
-        <!-- Sección para mostrar mensajes Flash (éxito, error, info, warning) -->
+        <!-- Mensajes Flash (usando la misma estructura que en add_book) -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
-                <div class="flash-messages"> <!-- Puedes estilizar esta clase en tu CSS -->
-                {% for category, message in messages %}
-                    <!-- Asigna clases CSS según la categoría del mensaje para darle estilo -->
-                    <div class="alert alert-{{ category }}">{{ message }}</div>
-                {% endfor %}
-                </div>
+                 <div class="flash-messages"> {# Contenedor general por si quieres estilizarlo #}
+                    {% for category, message in messages %}
+                        <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                 </div>
             {% endif %}
         {% endwith %}
-
-        <!-- Mostrar error específico si falló la carga de donantes -->
         {% if error_message %}
-         <div class="alert alert-error">{{ error_message }}</div>
+            <p class="error-msg">Error: {{ error_message }}</p> {# Mensaje de error específico más claro #}
         {% endif %}
 
-        <!-- El formulario que envía los datos a la ruta POST -->
-        <form action="{{ url_for('donations.add_monetary_donation_submit') }}" method="POST" class="form-standard"> <!-- Usa tu clase de formulario si tienes una -->
+        <!-- Formulario - Aplicamos las clases CSS -->
+        <form action="{{ url_for('donations.add_monetary_donation_submit') }}" method="POST">
 
-            <!-- Campo Desplegable para el Donante -->
-            <div class="form-group"> <!-- Usa tu clase para agrupar label+input -->
+            <!-- Campo Donante -->
+            <div class="form-group">  {# Usamos form-group #}
                 <label for="donor_id">Donante:</label>
-                <select name="donor_id" id="donor_id" required class="form-control"> <!-- Usa tu clase para inputs/selects -->
+                <select name="donor_id" id="donor_id" required> {# select heredará estilo de .form-group select #}
                     <option value="">-- Selecciona un donante --</option>
-                    <!-- Rellenar dinámicamente con los donantes pasados desde Flask -->
                     {% for donor in donors %}
-                    <option value="{{ donor.id }}">{{ donor.name }} (ID: {{ donor.id }})</option> <!-- Muestra Nombre e ID -->
+                    <option value="{{ donor.id }}">{{ donor.name }} (ID: {{ donor.id }})</option>
                     {% endfor %}
                 </select>
-                <!-- Mensaje útil si no hay donantes cargados -->
                 {% if not donors and not error_message %}
-                    <p class="form-hint">No hay donantes registrados o no se pudieron cargar. <a href="{{ url_for('donors.add_donor_form') }}">Añadir Donante Primero</a></p>
+                    <small style="display: block; margin-top: 5px;">No hay donantes disponibles. <a href="{{ url_for('donors.add_donor_form') }}">Añadir Donante</a>.</small> {# Mantenemos el enlace útil #}
                 {% endif %}
             </div>
 
-            <!-- Campo para el Monto -->
+            <!-- Campo Monto - Corregimos la etiqueta a CHF -->
             <div class="form-group">
-                <label for="amount">Monto (€):</label>
-                <!-- step="0.01" permite decimales, min="0.01" asegura positivo, required es obligatorio -->
-                <input type="number" name="amount" id="amount" step="0.01" min="0.01" required placeholder="Ej: 50.00" class="form-control">
+                <label for="amount">Monto (CHF):</label> {# <---- ¡¡CAMBIO A CHF!! #}
+                <input type="number" name="amount" id="amount" step="0.01" min="0.01" required placeholder="Ej: 50.00"> {# input heredará estilo #}
             </div>
 
-            <!-- Campo para la Fecha (Opcional) -->
+            <!-- Campo Fecha -->
             <div class="form-group">
                 <label for="donation_date">Fecha de la Donación (Opcional):</label>
-                <input type="date" name="donation_date" id="donation_date" class="form-control">
-                <p class="form-hint">Si dejas este campo vacío, se usará la fecha y hora actuales al guardar.</p>
+                <input type="date" name="donation_date" id="donation_date"> {# input type=date heredará estilo base #}
+                <small style="display: block; margin-top: 5px;">Dejar vacío para usar la fecha y hora actuales.</small> {# Usamos small para texto auxiliar #}
             </div>
 
-            <!-- Campo para Descripción/Nota (Opcional) -->
+            <!-- Campo Descripción -->
             <div class="form-group">
                 <label for="description">Descripción / Nota (Opcional):</label>
-                <textarea name="description" id="description" rows="3" placeholder="Ej: Donación para campaña 'Agua Limpia', pago por transferencia..." class="form-control"></textarea>
+                <textarea name="description" id="description" rows="3" placeholder="Ej: Donación para campaña 'Agua Limpia', pago por transferencia..." style="width: 95%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;"></textarea> {# Añadimos estilo inline similar al CSS para consistencia si textarea no está cubierto #}
+                {# Nota: Podrías añadir 'textarea' a la lista de selectores en tu CSS si quieres #}
+                {# .form-group input[type="text"], ..., .form-group select, .form-group textarea { ... } #}
             </div>
 
-            <!-- Botones de Acción -->
-            <div class="form-actions"> <!-- Clase para agrupar botones si quieres -->
-                <button type="submit" class="button primary">Registrar Donación</button>
-                <a href="{{ url_for('main.index') }}" class="button secondary">Cancelar / Volver a Inicio</a>
+            <!-- Botones de Acción - Usamos .form-actions y .btn como en add_book.html -->
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Registrar Donación</button> {# <--- Usar clase btn btn-primary #}
+                {# Usaremos btn para consistencia, puede que necesites añadir ".btn-secondary" o similar en tu CSS si quieres estilo diferente para Cancelar #}
+                <a href="{{ url_for('main.index') }}" class="btn">Cancelar / Volver</a> {# <--- Usar clase btn #}
             </div>
         </form>
+
     </div>
 </body>
 </html>

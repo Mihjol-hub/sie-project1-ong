@@ -181,8 +181,13 @@ tbody tr:hover {
  }
  .form-group input[type="text"],
  .form-group input[type="email"],
- .form-group input[type="tel"], /* Añadido para teléfono */
- .form-group select {
+ .form-group input[type="tel"],
+ .form-group input[type="number"],
+ .form-group input[type="date"],
+ .form-group input[type="text"],
+ .form-group input[type="email"],
+ .form-group select,
+ .form-group textarea {
      width: 95%; /* Ocupa casi todo el ancho disponible */
      padding: 10px;
      border: 1px solid #ccc;
@@ -190,9 +195,12 @@ tbody tr:hover {
      box-sizing: border-box; /* Importante para que el padding no aumente el ancho total */
  }
   .form-group input[type="text"]:focus,
+  .form-group input[type="number"]:focus,
+  .form-group input[type="date"]:focus,
   .form-group input[type="email"]:focus,
   .form-group input[type="tel"]:focus,
-  .form-group select:focus {
+  .form-group select:focus,
+  .form-group textarea:focus {
        border-color: #007bff; /* Resaltar al enfocar */
        box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25); /* Sombra sutil */
        outline: none; /* Quitar borde feo del navegador */

@@ -198,14 +198,14 @@ def add_monetary_donation_submit():
             # Si queremos que el pedido pase de 'Borrador' a 'Pedido de venta' directamente.
             # A veces es útil, a veces se prefiere revisar en Odoo primero.
             # Descomentar las siguientes líneas para activar la confirmación automática:
-            # try:
-            #     client.env['sale.order'].action_confirm([new_order_id])
-            #     logging.info(f"[donations_bp POST /add_monetary] Pedido {new_order_id} confirmado automáticamente en Odoo.")
-            #     flash(f'Pedido Odoo ID:{new_order_id} confirmado automáticamente.', 'info') # Mensaje adicional
-            # except Exception as confirm_err:
-            #     logging.error(f"[donations_bp POST /add_monetary] Error al intentar auto-confirmar el pedido Odoo ID {new_order_id}: {confirm_err}", exc_info=True)
-            #     # La donación se creó, pero la confirmación falló. Informar como warning.
-            #     flash(f'Donación registrada (ID:{new_order_id}), pero hubo un problema al confirmarla automáticamente en Odoo.', 'warning')
+            try:
+                client.env['sale.order'].action_confirm(new_order_id)
+                logging.info(f"[donations_bp POST /add_monetary] Pedido {new_order_id} confirmado automáticamente en Odoo.")
+                flash(f'Pedido Odoo ID:{new_order_id} confirmado automáticamente.', 'info') # Mensaje adicional
+            except Exception as confirm_err:
+                logging.error(f"[donations_bp POST /add_monetary] Error al auto-confirmar el pedido Odoo ID {new_order_id}: {confirm_err}", exc_info=True)
+                # La donación se creó, pero la confirmación falló. Informar como warning.
+                flash(f'Donación registrada (ID:{new_order_id}), pero hubo un problema al confirmarla automáticamente en Odoo.', 'warning')
 
         else:
              # Esto no debería ocurrir si no hay excepción, pero por si acaso
