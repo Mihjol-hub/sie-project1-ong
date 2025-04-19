@@ -14,13 +14,48 @@ TAG_ID_RECHAZADO = 6
 books_bp = Blueprint('books', __name__)
 
 # --- Ruta para MOSTRAR el formulario de añadir libro (CON CARGA DE DONANTES) ---
-# ... (tu código existente de add_book_form - SIN CAMBIOS) ...
+
 @books_bp.route('/add_book', methods=['GET'])
 def add_book_form():
-    donors = [] 
+    donors = [] # Inicializar como lista vacía
     error_message = None
+
     client = get_odoo_client()
-    # ... (resto del código sin cambios) ...
+    if not client:
+        flash('Error de conexión con Odoo. No se pueden cargar los donantes.', 'error')
+        error_message = "Error de conexión con Odoo al cargar donantes." # Mensaje más específico
+        # No hacemos return aquí todavía, para renderizar el form aunque sea sin donantes
+    else:
+        # Intentar obtener la lista de donantes SOLO si la conexión fue exitosa
+        try:
+            # Buscar partners de tipo 'persona' (asumiendo que son los donantes/voluntarios)
+            # Ordenamos por nombre ascendente para el desplegable
+            donor_ids = client.env['res.partner'].search(
+                [('company_type', '=', 'person')], 
+                limit=150,  # Aumentamos límite por si acaso
+                order="name asc" 
+            )
+            logging.info(f"[books_bp GET /add_book] IDs de donantes encontrados: {donor_ids}")
+            
+            if donor_ids:
+                # Leer solo el ID y el nombre para el desplegable
+                donors = client.env['res.partner'].read(donor_ids, ['id', 'name'])
+                logging.info(f"[books_bp GET /add_book] Datos de donantes (id, name) leídos: {len(donors)} encontrados.")
+            else:
+                logging.info("[books_bp GET /add_book] No se encontraron partners tipo 'persona'.")
+                # Podríamos poner un flash info aquí si queremos, pero no es crítico
+                # flash('No hay donantes registrados para seleccionar.', 'info')
+
+        except odoorpc.error.RPCError as e:
+            logging.error(f"[books_bp GET /add_book] Error RPC al cargar donantes: {e}", exc_info=True)
+            error_message = f"Error RPC al cargar lista de donantes: {e}"
+            flash(error_message, 'error')
+        except Exception as e:
+            logging.error(f"[books_bp GET /add_book] Error inesperado al cargar donantes: {e}", exc_info=True)
+            error_message = f"Error inesperado al cargar donantes: {e}"
+            flash(error_message, 'error')
+            
+    # Renderizar SIEMPRE la plantilla, pasando la lista 'donors' (que estará llena o vacía)
     return render_template('add_book.html', donors=donors, error_message=error_message)
 
 

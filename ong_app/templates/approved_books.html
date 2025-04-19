@@ -1,31 +1,15 @@
-<!-- ong_app/templates/approved_books.html -->
+<!-- ong_app/templates/approved_books.html (Ajustado) -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Libros Aprobados</title> {# <-- TÍTULO CAMBIADO #}
-    <style>
-        /* Estilos (los mismos que antes) */
-        body { font-family: sans-serif; padding: 20px; }
-        .container { max-width: 900px; margin: auto; background-color: #f9f9f9; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);}
-        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
-        tr:nth-child(even) { background-color: #f9f9f9; }
-        .flash-message { padding: 10px; margin-bottom: 15px; border-radius: 4px; }
-        .flash-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .flash-error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-        .flash-info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
-        a { color: #007bff; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        .no-items { font-style: italic; color: #666; }
-        .error-msg { color: #721c24; font-weight: bold; margin-bottom: 15px;}
-    </style>
+    <title>Libros Aprobados</title> 
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="container">
-        <h1>Libros Aprobados</h1> {# <-- H1 CAMBIADO #}
+        <h1>Libros Aprobados</h1> 
 
         <!-- Mensajes Flash -->
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -50,7 +34,6 @@
                         <th>Título</th>
                         <th>ISBN (Ref. Interna)</th>
                         <th>Notas (Autor/Donante)</th>
-                        {# NO HAY COLUMNA "ACCIONES" #}
                     </tr>
                 </thead>
                 <tbody>
@@ -60,19 +43,19 @@
                         <td>{{ book.name }}</td>
                         <td>{{ book.default_code if book.default_code else '-' }}</td>
                         <td>{{ book.description if book.description else '-' }}</td>
-                        {# NO HAY CELDA CON BOTONES #}
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         {% elif not error_message %}
-             <p class="no-items">No hay libros aprobados actualmente.</p> {# <-- Mensaje CAMBIADO #}
+             <p class="no-items">No hay libros aprobados actualmente.</p> 
         {% endif %}
 
         <hr>
-        <p>
-            <a href="{{ url_for('main.index') }}">Volver a Inicio</a>
-        </p>
+        {# Usamos div.form-actions para mantener el estilo del botón de volver #}
+        <div class="form-actions" style="text-align: left;"> {# Lo alineamos a la izquierda aquí #}
+            <a href="{{ url_for('main.index') }}" class="btn">Volver a Inicio</a> {# <--- Clase btn añadida #}
+        </div>
     </div>
 </body>
 </html>

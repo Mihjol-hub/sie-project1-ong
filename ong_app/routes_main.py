@@ -3,6 +3,7 @@ from flask import Blueprint, render_template, jsonify, redirect, url_for
 from .odoo_connector import get_odoo_client # Importa la función de conexión
 import logging
 import odoorpc # Importamos para manejar sus excepciones específicas
+#from .routes_books import TAG_ID_PENDIENTE, TAG_ID_APROBADO, TAG_ID_RECHAZADO 
 
 # Crear el Blueprint 'main'
 # El primer argumento 'main' es el nombre del blueprint (interno)
@@ -11,15 +12,75 @@ import odoorpc # Importamos para manejar sus excepciones específicas
 # Por ahora, Flask buscará en la carpeta 'templates' principal definida en create_app.
 main_bp = Blueprint('main', __name__)
 
+# --- IMPORTANTE: Asegúrate de que los IDs de las etiquetas están definidos aquí o en otro lugar accesible ---
+TAG_ID_PENDIENTE_MAIN = 4 # Reemplazar con el ID REAL de 'Donado: Aprobado'
+TAG_ID_APROBADO_MAIN = 5
+TAG_ID_RECHAZADO_MAIN = 6
+
+
+# --- RUTAS DEL BLUEPRINT PRINCIPAL ---
+
 @main_bp.route('/')
 def index():
     titulo = "Proyecto ONG - Integración SIE"
-    client = get_odoo_client() # Usa la función importada
+    client = get_odoo_client() 
     odoo_status = "Conectado (Verificado!)" if client else "Desconectado (Revisa Logs!)"
-    logging.info(f"Renderizando index desde main_bp con estado Odoo: {odoo_status}")
-    # Asume que Flask encontrará 'index.html' en la carpeta templates global
-    return render_template('index.html', page_title=titulo, odoo_connection_status=odoo_status)
+    
+    # Inicializar contadores
+    counts = {
+        'pending': 0,
+        'approved': 0,
+        'rejected': 0
+    }
+    count_error = None # Para errores específicos del conteo
 
+    if client:
+        logging.info("[main_bp index] **VERIFICANDO IDs LOCALES A USAR:**") # Log actualizado
+        logging.info(f"  - PENDIENTE_MAIN = {TAG_ID_PENDIENTE_MAIN}")
+        logging.info(f"  - APROBADO_MAIN  = {TAG_ID_APROBADO_MAIN}")
+        logging.info(f"  - RECHAZADO_MAIN = {TAG_ID_RECHAZADO_MAIN}")
+        
+        logging.info("[main_bp index] Cliente Odoo conectado, obteniendo contadores...")
+        try:
+            ProductModel = client.env['product.template'] 
+            
+            # Usar las constantes LOCALES '_MAIN'
+            counts['pending'] = ProductModel.search_count([('product_tag_ids', '=', TAG_ID_PENDIENTE_MAIN)])
+            logging.info(f"[main_bp index] >> RESULTADO search_count Pendiente (ID={TAG_ID_PENDIENTE_MAIN}): {counts['pending']}")
+
+            counts['approved'] = ProductModel.search_count([('product_tag_ids', '=', TAG_ID_APROBADO_MAIN)])
+            logging.info(f"[main_bp index] >> RESULTADO search_count Aprobado (ID={TAG_ID_APROBADO_MAIN}): {counts['approved']}")
+            
+            counts['rejected'] = ProductModel.search_count([('product_tag_ids', '=', TAG_ID_RECHAZADO_MAIN)])
+            logging.info(f"[main_bp index] >> RESULTADO search_count Rechazado (ID={TAG_ID_RECHAZADO_MAIN}): {counts['rejected']}")
+
+        except odoorpc.error.RPCError as e:
+            
+            logging.error(f"[main_bp index] Error RPC al obtener contadores: {e}", exc_info=True)
+            count_error = f"Error RPC Odoo al obtener contadores: {e}"
+            # Los counts seguirán en 0, mostramos el error
+        
+        except Exception as e:
+             logging.error(f"[main_bp index] Error inesperado al obtener contadores: {e}", exc_info=True)
+             count_error = f"Error inesperado al obtener contadores: {e}"
+             # Los counts seguirán en 0, mostramos el error
+    
+    else:
+        logging.warning("[main_bp index] No hay cliente Odoo, no se pueden obtener contadores.")
+        # Ya tenemos el odoo_status, no necesitamos otro error aquí
+        pass # Los counts quedarán en 0
+
+    logging.info(f"Renderizando index desde main_bp con estado Odoo: {odoo_status}, Counts: {counts}")
+    
+    # Pasamos los contadores y el posible error de conteo a la plantilla
+    return render_template('index.html', 
+                           page_title=titulo, 
+                           odoo_connection_status=odoo_status,
+                           book_counts=counts,          # <-- Diccionario con cuentas
+                           count_fetch_error=count_error # <-- Error específico del conteo
+                           )
+
+# --- RUTA DE PRUEBA PARA ODOO ---
 @main_bp.route('/api/odoo_version')
 def odoo_version_test():
     logging.info("Recibida petición para /api/odoo_version en main_bp")

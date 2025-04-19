@@ -1,35 +1,76 @@
-<!-- ong_app/templates/index.html -->
+<!-- ong_app/templates/index.html (CORREGIDO) -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ page_title }}</title>
-    <style>
-        body { font-family: sans-serif; padding: 20px; }
-        h1 { color: #333; }
-        p { color: #555;}
-        .container { max-width: 800px; margin: auto; background-color: #f9f9f9; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);}
-        a { color: #007bff; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-    </style>
+    <title>{{ page_title }} - Panel Principal</title> 
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="container">
-        <h1>¡Bienvenido!</h1>
-        <p>La aplicación Flask está funcionando dentro de Docker en GitHub Codespaces.</p>
-        <p>El siguiente paso es configurar Odoo y empezar a interactuar con él.</p>
-        <p><b>Estado conexión Odoo:</b> {{ odoo_connection_status }}</p>
-        <p><a href="{{ url_for('main.odoo_version_test') }}">Probar obtener versión Odoo</a></p>
-        <p><a href="{{ url_for('main.api_hello') }}">Probar endpoint API simple</a></p>
+        <h1>{{ page_title }}</h1>
+        <p>Aplicación de Gestión de Donaciones (Flask + Odoo) - Propuesta 1 (Adaptada).</p>
+
+        <div class="dashboard-section" style="text-align: center; margin-bottom: 30px; padding: 20px; background-color:#f0f0f0; border-radius:5px;">
+            <h2>Resumen Rápido</h2>
+            {% if count_fetch_error %}
+                <p class="error-msg">Error al cargar resumen: {{ count_fetch_error }}</p>
+            {% else %}
+                {# Usamos estilos inline simples para los cuadros, puedes mejorarlo en CSS si quieres #}
+                <span style="display: inline-block; margin: 10px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #fff;">
+                    <a href="{{ url_for('books.review_books') }}" style="text-decoration:none; color: inherit;">
+                        <strong style="font-size: 1.8em; display:block;">{{ book_counts.pending }}</strong> Libros Pendientes
+                    </a>
+                </span>
+                <span style="display: inline-block; margin: 10px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #fff;">
+                    <a href="{{ url_for('books.approved_books') }}" style="text-decoration:none; color: inherit;">
+                         <strong style="font-size: 1.8em; display:block;">{{ book_counts.approved }}</strong> Libros Aprobados
+                    </a>
+                </span>
+                <span style="display: inline-block; margin: 10px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #fff;">
+                    <a href="{{ url_for('books.rejected_books') }}" style="text-decoration:none; color: inherit;">
+                         <strong style="font-size: 1.8em; display:block;">{{ book_counts.rejected }}</strong> Libros Rechazados
+                     </a>
+                </span>
+            {% endif %}
+        </div>
+
+        <div class="info-section">
+            <h2>Información del Sistema</h2>
+            <ul>
+                 {% set status_class = 'status-connected' if 'Conectado' in odoo_connection_status else 'status-disconnected' %}
+                 <li><b>Estado conexión Odoo:</b> <span class="{{ status_class }}">{{ odoo_connection_status }}</span></li>
+                 <li><a href="{{ url_for('main.odoo_version_test') }}">Ver versión Odoo (API)</a></li>
+                 {# Quitamos el /api/hello que no es relevante para el usuario final #}
+                 {# <li><a href="{{ url_for('main.api_hello') }}">Probar endpoint API simple Flask</a></li> #}
+            </ul>
+        </div>
+        
         <hr>
-        <p><a href="{{ url_for('books.review_books') }}">Revisar Libros Pendientes</a></p>
-        <p><a href="{{ url_for('books.review_books', status='approved') }}">Revisar Libros Aprobados</a></p>
-        <p><a href="{{ url_for('books.review_books', status='rejected') }}">Revisar Libros Rechazados</a></p>
-        <p><a href="{{ url_for('donors.list_donors') }}">Ver Donantes Registrados</a></p>
-        <p><a href="{{ url_for('donors.add_donor_form') }}">Registrar Nuevo Donante/Voluntario</a></p>
-        <p><a href="{{ url_for('books.list_books') }}">Ver Libros Registrados</a></p>
-        <p><a href="{{ url_for('books.add_book_form') }}">Registrar un Nuevo Libro Donado</a></p>
+
+        <div class="books-section">
+            <h2>Gestión de Libros Donados</h2>
+            <ul>
+                <li><a href="{{ url_for('books.add_book_form') }}">➡️ Registrar Nuevo Libro Donado</a></li>
+                <li><a href="{{ url_for('books.review_books') }}">🔍 Revisar Libros Pendientes</a></li>
+                <li><a href="{{ url_for('books.approved_books') }}">✅ Ver Libros Aprobados</a></li>
+                <li><a href="{{ url_for('books.rejected_books') }}">❌ Ver Libros Rechazados</a></li>
+                <li><a href="{{ url_for('books.list_books') }}">📚 Ver TODOS los Libros Registrados</a></li>
+            </ul>
+        </div>
+        
+        <hr>
+
+        <div class="donors-section">
+            <h2>Gestión de Donantes / Voluntarios</h2>
+            <ul>
+                 <li><a href="{{ url_for('donors.add_donor_form') }}">➕ Registrar Nuevo Donante/Voluntario</a></li>
+                 <li><a href="{{ url_for('donors.list_donors') }}">👥 Ver Donantes Registrados</a></li>
+                 {# Añadir aquí enlaces si implementas Editar/Borrar Donantes #}
+            </ul>
+        </div>
+
     </div>
 </body>
 </html>

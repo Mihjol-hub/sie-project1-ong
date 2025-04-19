@@ -1,0 +1,218 @@
+/* ong_app/static/css/style.css */
+
+/* Estilos Generales */
+body {
+    font-family: sans-serif;
+    padding: 20px;
+    background-color: #e9ecef; /* Un fondo ligeramente gris para la página */
+    color: #333; /* Color de texto por defecto */
+}
+
+.container {
+    max-width: 950px; /* Un poco más ancho */
+    margin: 30px auto; /* Margen arriba/abajo */
+    background-color: #fff; /* Fondo blanco */
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Sombra un poco más pronunciada */
+}
+
+h1, h2, h3 {
+    color: #333;
+    margin-top: 1em;
+    margin-bottom: 0.7em;
+}
+h1 { 
+    text-align: center; 
+    margin-bottom: 1.2em;
+    border-bottom: 1px solid #eee; /* Línea sutil bajo H1 */
+    padding-bottom: 10px;
+}
+
+p, li {
+    color: #555;
+    line-height: 1.6; /* Mejor espaciado de línea */
+    margin-bottom: 10px;
+}
+
+ul {
+    list-style: none;
+    padding-left: 0;
+}
+
+a {
+    color: #007bff;
+    text-decoration: none;
+}
+a:hover {
+    text-decoration: underline;
+}
+
+hr {
+    margin-top: 25px;
+    margin-bottom: 25px;
+    border: 0;
+    border-top: 1px solid #eee;
+}
+
+/* Tablas */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05); /* Sombra ligera para tablas */
+}
+th, td {
+    border: 1px solid #ddd;
+    padding: 10px 12px; /* Un poco más de padding */
+    text-align: left;
+}
+th {
+    background-color: #f8f9fa; /* Fondo más claro para cabeceras */
+    font-weight: bold; /* Asegurar negrita */
+    color: #495057; /* Color más oscuro */
+}
+/* Estilo para filas alternas */
+tbody tr:nth-child(even) { 
+    background-color: #f9f9f9; 
+} 
+/* Hover sobre filas (opcional) */
+tbody tr:hover {
+    background-color: #f1f1f1;
+}
+
+/* Mensajes Flash */
+.flash-message {
+    padding: 12px 15px; /* Más padding */
+    margin-bottom: 20px;
+    border-radius: 5px; /* Bordes un poco más redondeados */
+    border: 1px solid transparent;
+}
+.flash-success { background-color: #d4edda; color: #155724; border-color: #c3e6cb; }
+.flash-error { background-color: #f8d7da; color: #721c24; border-color: #f5c6cb; }
+.flash-info { background-color: #d1ecf1; color: #0c5460; border-color: #bee5eb; }
+.flash-warning { background-color: #fff3cd; color: #856404; border-color: #ffeeba; } /* Añadido Warning */
+
+/* Texto específico de errores o vacío */
+.no-items { font-style: italic; color: #6c757d; /* Gris más estándar */ }
+.error-msg { color: #721c24; font-weight: bold; margin-bottom: 15px;}
+
+/* Estilos para Secciones (usados en index.html) */
+.info-section, .books-section, .donors-section {
+    margin-bottom: 25px;
+    padding: 20px;
+    border: 1px solid #eee;
+    border-radius: 5px;
+    background-color: #fff; 
+}
+.info-section { border-left: 4px solid #007bff; } 
+.books-section { border-left: 4px solid #28a745; } 
+.donors-section { border-left: 4px solid #ffc107; } 
+
+/* Botones (Revisados de review_books.html) */
+.btn { 
+    display: inline-block; 
+    padding: 6px 12px;    
+    margin-bottom: 0;      
+    font-size: 14px; /* Tamaño de fuente estándar Bootstrap */     
+    font-weight: 400;
+    line-height: 1.42857143;     
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: middle;
+    cursor: pointer;
+    user-select: none;     
+    background-image: none; 
+    border: 1px solid transparent;
+    border-radius: 4px;    
+    transition: all 0.2s ease-in-out; 
+    text-decoration: none; 
+}
+.btn:hover, .btn:focus {
+     opacity: 0.85; 
+}
+.btn:active {
+     box-shadow: inset 0 3px 5px rgba(0,0,0,.125); 
+     transform: translateY(1px); /* Pequeño efecto de presión */
+}
+
+/* Botón Default/Standard (útil para "Añadir", "Guardar") */
+.btn-primary {
+    color: #fff;
+    background-color: #007bff;
+    border-color: #007bff;
+}
+ .btn-primary:hover {
+    color: #fff;
+    background-color: #0056b3;
+    border-color: #0056b3;
+}
+
+/* Botón Success (Aprobar) */
+.btn-success { 
+    color: #fff;
+    background-color: #5cb85c; 
+    border-color: #4cae4c;
+}
+.btn-success:hover {
+     background-color: #449d44;
+     border-color: #398439;
+}
+
+/* Botón Danger (Rechazar, Borrar) */
+.btn-danger { 
+    color: #fff;
+    background-color: #d9534f; 
+    border-color: #d43f3a;
+}
+ .btn-danger:hover {
+    background-color: #c9302c;
+    border-color: #ac2925;
+ }
+ 
+ /* Para Formularios */
+ .form-group {
+     margin-bottom: 15px; /* Espacio entre campos del formulario */
+ }
+ .form-group label {
+     display: block; /* Etiqueta arriba del campo */
+     margin-bottom: 5px;
+     font-weight: bold;
+ }
+ .form-group input[type="text"],
+ .form-group input[type="email"],
+ .form-group input[type="tel"], /* Añadido para teléfono */
+ .form-group select {
+     width: 95%; /* Ocupa casi todo el ancho disponible */
+     padding: 10px;
+     border: 1px solid #ccc;
+     border-radius: 4px;
+     box-sizing: border-box; /* Importante para que el padding no aumente el ancho total */
+ }
+  .form-group input[type="text"]:focus,
+  .form-group input[type="email"]:focus,
+  .form-group input[type="tel"]:focus,
+  .form-group select:focus {
+       border-color: #007bff; /* Resaltar al enfocar */
+       box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25); /* Sombra sutil */
+       outline: none; /* Quitar borde feo del navegador */
+  }
+
+ .form-actions {
+     margin-top: 20px;
+     padding-top: 15px;
+     border-top: 1px solid #eee; /* Separador antes de botones de formulario */
+     text-align: right; /* Alinear botones a la derecha */
+ }
+ .form-actions .btn {
+     margin-left: 10px; /* Espacio entre botones */
+ }
+
+ /* Estilo específico para la celda de acciones en review_books */
+ td.actions-cell { 
+    white-space: nowrap; 
+    text-align: center; 
+    min-width: 160px; /* Corregido: Añadido punto y coma */
+ } 
+
+ 
