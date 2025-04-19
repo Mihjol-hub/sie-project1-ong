@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Lista de Donaciones Monetarias - ONG</title>
+    <!-- Enlace a tu archivo CSS existente -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container"> <!-- Usa tu clase contenedora principal -->
+        <h1>Donaciones Monetarias Registradas</h1>
+
+        <!-- Mostrar Mensajes Flash -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        {% if error_message %}
+            <div class="alert alert-error">{{ error_message }}</div>
+        {% endif %}
+
+        <!-- Barra de acciones: Botón para añadir nueva y volver -->
+        <div class="action-bar"> <!-- Clase para estilizar esta barra si quieres -->
+             <a href="{{ url_for('donations.add_monetary_donation_form') }}" class="button primary">Añadir Nueva Donación Monetaria</a>
+             <a href="{{ url_for('main.index') }}" class="button secondary">Volver a Inicio</a>
+        </div>
+
+        <!-- Tabla para mostrar las donaciones -->
+        {% if donations %} {# Solo muestra la tabla si la lista 'donations' no está vacía #}
+        <table class="table-standard"> <!-- Usa tu clase para tablas -->
+            <thead>
+                <tr>
+                    <th>Referencia Odoo</th>
+                    <th>Donante</th>
+                    <th>Monto Total (€)</th>
+                    <th>Fecha del Pedido</th>
+                    <th>Estado en Odoo</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Itera sobre cada 'donation' en la lista pasada desde Flask -->
+                {% for donation in donations %}
+                <tr>
+                    <!-- Muestra la referencia del sale.order (ej: SO001) y su ID -->
+                    <td>{{ donation.name }} (ID: {{ donation.id }})</td>
+                    <!-- Muestra el nombre del donante. 'partner_id' es [ID, Nombre], accedemos al nombre con [1] -->
+                    <td>{{ donation.partner_id[1] if donation.partner_id else 'N/D (Sin Partner)' }}</td>
+                    <!-- Muestra el monto total, formateado a 2 decimales -->
+                    <td>{{ "%.2f"|format(donation.amount_total) }}</td>
+                     <!-- Muestra la fecha del pedido -->
+                    <td>{{ donation.date_order }}</td>
+                    <!-- Muestra el estado del pedido en Odoo (ej: draft, sale, done, cancel) -->
+                    <td>{{ donation.state }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% elif not error_message %} {# Si la lista está vacía Y no hubo error de carga, muestra mensaje #}
+            <p>No hay donaciones monetarias registradas todavía.</p>
+        {% endif %}
+
+    </div>
+</body>
+</html>

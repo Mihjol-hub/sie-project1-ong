@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Añadir Donación Monetaria - ONG</title>
+    <!-- Enlace a tu archivo CSS existente -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container"> <!-- Usa tu clase contenedora principal si es diferente -->
+        <h1>Registrar Nueva Donación Monetaria</h1>
+
+        <!-- Sección para mostrar mensajes Flash (éxito, error, info, warning) -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages"> <!-- Puedes estilizar esta clase en tu CSS -->
+                {% for category, message in messages %}
+                    <!-- Asigna clases CSS según la categoría del mensaje para darle estilo -->
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <!-- Mostrar error específico si falló la carga de donantes -->
+        {% if error_message %}
+         <div class="alert alert-error">{{ error_message }}</div>
+        {% endif %}
+
+        <!-- El formulario que envía los datos a la ruta POST -->
+        <form action="{{ url_for('donations.add_monetary_donation_submit') }}" method="POST" class="form-standard"> <!-- Usa tu clase de formulario si tienes una -->
+
+            <!-- Campo Desplegable para el Donante -->
+            <div class="form-group"> <!-- Usa tu clase para agrupar label+input -->
+                <label for="donor_id">Donante:</label>
+                <select name="donor_id" id="donor_id" required class="form-control"> <!-- Usa tu clase para inputs/selects -->
+                    <option value="">-- Selecciona un donante --</option>
+                    <!-- Rellenar dinámicamente con los donantes pasados desde Flask -->
+                    {% for donor in donors %}
+                    <option value="{{ donor.id }}">{{ donor.name }} (ID: {{ donor.id }})</option> <!-- Muestra Nombre e ID -->
+                    {% endfor %}
+                </select>
+                <!-- Mensaje útil si no hay donantes cargados -->
+                {% if not donors and not error_message %}
+                    <p class="form-hint">No hay donantes registrados o no se pudieron cargar. <a href="{{ url_for('donors.add_donor_form') }}">Añadir Donante Primero</a></p>
+                {% endif %}
+            </div>
+
+            <!-- Campo para el Monto -->
+            <div class="form-group">
+                <label for="amount">Monto (€):</label>
+                <!-- step="0.01" permite decimales, min="0.01" asegura positivo, required es obligatorio -->
+                <input type="number" name="amount" id="amount" step="0.01" min="0.01" required placeholder="Ej: 50.00" class="form-control">
+            </div>
+
+            <!-- Campo para la Fecha (Opcional) -->
+            <div class="form-group">
+                <label for="donation_date">Fecha de la Donación (Opcional):</label>
+                <input type="date" name="donation_date" id="donation_date" class="form-control">
+                <p class="form-hint">Si dejas este campo vacío, se usará la fecha y hora actuales al guardar.</p>
+            </div>
+
+            <!-- Campo para Descripción/Nota (Opcional) -->
+            <div class="form-group">
+                <label for="description">Descripción / Nota (Opcional):</label>
+                <textarea name="description" id="description" rows="3" placeholder="Ej: Donación para campaña 'Agua Limpia', pago por transferencia..." class="form-control"></textarea>
+            </div>
+
+            <!-- Botones de Acción -->
+            <div class="form-actions"> <!-- Clase para agrupar botones si quieres -->
+                <button type="submit" class="button primary">Registrar Donación</button>
+                <a href="{{ url_for('main.index') }}" class="button secondary">Cancelar / Volver a Inicio</a>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

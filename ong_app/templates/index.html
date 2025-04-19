@@ -70,6 +70,17 @@
                  {# Añadir aquí enlaces si implementas Editar/Borrar Donantes #}
             </ul>
         </div>
+        <hr> 
+
+        <div class="donations-monetary-section"> 
+            <h2>Gestión de Donaciones Monetarias</h2>
+            <ul>
+                 <li><a href="{{ url_for('donations.add_monetary_donation_form') }}">💰 Registrar Nueva Donación Monetaria</a></li>
+                 <li><a href="{{ url_for('donations.list_monetary_donations') }}">📊 Ver Donaciones Monetarias Registradas</a></li>
+    
+            </ul>
+        </div>
+        
 
     </div>
 </body>
