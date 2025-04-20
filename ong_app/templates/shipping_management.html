@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Envío - ONG</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Gestión de Envío Logístico</h1>
+        <p>Libros listos para enviar o actualmente en tránsito.</p>
+
+        <!-- Mensajes Flash y Error -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                 <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                 </div>
+            {% endif %}
+        {% endwith %}
+        {% if error_message %}
+            <p class="error-msg">Error al cargar: {{ error_message }}</p>
+        {% endif %}
+
+        <!-- Tabla del Pipeline -->
+        {% if books %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Título</th>
+                        <th>ISBN</th>
+                        <th>Estado Actual</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for book in books %}
+                    <tr>
+                        <td>{{ book.id }}</td>
+                        <td>{{ book.name }}</td>
+                        <td>{{ book.default_code if book.default_code else '-' }}</td>
+                        <td>
+                            {# Determinar estado basado en los tags presentes #}
+                            {% if TAG_ID_READY in book.product_tag_ids %}
+                                <span style="color: orange; font-weight: bold;">Listo para Envío</span>
+                            {% elif TAG_ID_TRANSIT_EC in book.product_tag_ids %}
+                                <span style="color: blue; font-weight: bold;">En Tránsito (Ecuador)</span>
+                            {% elif TAG_ID_TRANSIT_VE in book.product_tag_ids %}
+                                <span style="color: #ff5733; font-weight: bold;">En Tránsito (Venezuela)</span>
+                            {% elif TAG_ID_TRANSIT_GENERAL in book.product_tag_ids %}
+                                <span style="color: purple; font-weight: bold;">En Tránsito (General)</span>
+                            {% else %}
+                                <span style="color: grey;">Estado Desconocido</span>
+                            {% endif %}
+                        </td>
+                        <td class="actions-cell">
+                            {# Acciones condicionales según el estado #}
+
+                            {# --- Si está LISTO PARA ENVÍO (Tag ID 7) --- #}
+                            {% if TAG_ID_READY in book.product_tag_ids %}
+                                {# Botón para enviar a Ecuador (apunta a ruta que crearemos) #}
+                                <form action="{{ url_for('books.mark_in_transit', destination_tag_id=TAG_ID_TRANSIT_EC, book_id=book.id) }}" method="POST" style="display: inline; margin-bottom: 5px;">
+                                    <button type="submit" class="btn btn-success" title="Marcar como En Tránsito a Ecuador">🇪🇨 Enviar ECU</button>
+                                </form>
+                                {# Botón para enviar a Venezuela (apunta a ruta que crearemos) #}
+                                 <form action="{{ url_for('books.mark_in_transit', destination_tag_id=TAG_ID_TRANSIT_VE, book_id=book.id) }}" method="POST" style="display: inline;">
+                                    <button type="submit" class="btn btn-info" title="Marcar como En Tránsito a Venezuela">🇻🇪 Enviar VEN</button> {# Usamos btn-info para diferenciar #}
+                                </form>
+                            {% endif %}
+
+                            {# --- Si está EN TRÁNSITO (Cualquiera de los IDs de tránsito) --- #}
+                            {% if TAG_ID_TRANSIT_EC in book.product_tag_ids or
+                                  TAG_ID_TRANSIT_VE in book.product_tag_ids or
+                                  TAG_ID_TRANSIT_GENERAL in book.product_tag_ids %}
+                                {# Botón para marcar como entregado (apunta a ruta que crearemos) #}
+                                <form action="{{ url_for('books.mark_delivered', book_id=book.id) }}" method="POST" style="display: inline;">
+                                    <button type="submit" class="btn btn-primary" title="Confirmar que el libro ha sido entregado">✅ Entregado</button>
+                                </form>
+                            {% endif %}
+
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% elif not error_message %}
+             <p class="no-items">No hay libros en el pipeline de envío actualmente.</p>
+        {% endif %}
+
+        <hr>
+         <div class="form-actions" style="text-align: left;">
+             <a href="{{ url_for('main.index') }}" class="btn">Volver a Inicio</a>
+         </div>
+    </div>
+</body>
+</html>

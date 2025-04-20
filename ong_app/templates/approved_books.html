@@ -43,6 +43,12 @@
                         <td>{{ book.name }}</td>
                         <td>{{ book.default_code if book.default_code else '-' }}</td>
                         <td>{{ book.description if book.description else '-' }}</td>
+                        <td class="actions-cell"> {# Usa tu clase de celda de acciones si la tienes #}
+            <form action="{{ url_for('books.mark_ready_for_shipment', book_id=book.id) }}" method="POST" style="display: inline;">
+        <button type="submit" class="btn btn-primary">➡️ Listo para Envío</button> {# Clase btn-primary o la que prefieras #}
+    </form>
+    {# Aquí podrías poner otros botones si fueran necesarios para esta vista #}
+</td>
                     </tr>
                     {% endfor %}
                 </tbody>
