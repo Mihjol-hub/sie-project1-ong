@@ -1,67 +1,102 @@
-<!-- ong_app/templates/approved_books.html (Ajustado) -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Libros Aprobados</title> 
+    <!-- Título actualizado -->
+    <title>Preparar Envío de Libros Aprobados</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="container">
-        <h1>Libros Aprobados</h1> 
+        <!-- Título actualizado -->
+        <h1>Preparar Envío de Lote de Libros</h1>
+        <p>Selecciona los libros aprobados que deseas incluir en el envío y elige el destino.</p>
 
-        <!-- Mensajes Flash -->
+        <!-- Mensajes Flash y Error -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
-                {% for category, message in messages %}
-                    <div class="flash-message flash-{{ category }}">{{ message }}</div>
-                {% endfor %}
+                 <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                 </div>
             {% endif %}
         {% endwith %}
-
-        <!-- Mensaje de Error Carga -->
         {% if error_message %}
-            <p class="error-msg">Error al cargar la lista: {{ error_message }}</p>
+            <p class="error-msg">Error al cargar: {{ error_message }}</p>
         {% endif %}
 
-        <!-- Tabla de Libros Aprobados -->
-        {% if books %}
-            <table>
-                <thead>
-                    <tr>
-                        <th>ID Odoo</th>
-                        <th>Título</th>
-                        <th>ISBN (Ref. Interna)</th>
-                        <th>Notas (Autor/Donante)</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for book in books %}
-                    <tr>
-                        <td>{{ book.id }}</td>
-                        <td>{{ book.name }}</td>
-                        <td>{{ book.default_code if book.default_code else '-' }}</td>
-                        <td>{{ book.description if book.description else '-' }}</td>
-                        <td class="actions-cell"> {# Usa tu clase de celda de acciones si la tienes #}
-            <form action="{{ url_for('books.mark_ready_for_shipment', book_id=book.id) }}" method="POST" style="display: inline;">
-        <button type="submit" class="btn btn-primary">➡️ Listo para Envío</button> {# Clase btn-primary o la que prefieras #}
-    </form>
-    {# Aquí podrías poner otros botones si fueran necesarios para esta vista #}
-</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        {% elif not error_message %}
-             <p class="no-items">No hay libros aprobados actualmente.</p> 
-        {% endif %}
+        {# === INICIO DEL FORMULARIO QUE ENVUELVE TODO === #}
+        {# Apuntará a una nueva ruta POST que crearemos: 'create_batch_shipment' #}
+        <form action="{{ url_for('books.create_batch_shipment') }}" method="POST">
 
-        <hr>
-        {# Usamos div.form-actions para mantener el estilo del botón de volver #}
-        <div class="form-actions" style="text-align: left;"> {# Lo alineamos a la izquierda aquí #}
-            <a href="{{ url_for('main.index') }}" class="btn">Volver a Inicio</a> {# <--- Clase btn añadida #}
-        </div>
+            <!-- Tabla de Libros Aprobados (Pendientes de Logística) -->
+            {% if books %}
+                <table class="table-standard">
+                    <thead>
+                        <tr>
+                            {# 1. NUEVA COLUMNA PARA CHECKBOX #}
+                            <th style="width: 30px; text-align: center;">Sel.</th>
+                            <th>ID</th>
+                            <th>Título</th>
+                            <th>ISBN</th>
+                            <th>Notas</th>
+                            {# Quitamos la columna de acciones individuales que teníamos antes #}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for book in books %}
+                        <tr>
+                             {# 1. CELDA CON EL CHECKBOX #}
+                             <td style="text-align: center;">
+                                 {# El 'name' es importante para recoger la lista en Flask #}
+                                 {# El 'value' será el ID del libro #}
+                                 <input type="checkbox" name="selected_book_ids" value="{{ book.id }}">
+                             </td>
+                             <td>{{ book.id }}</td>
+                             <td>{{ book.name }}</td>
+                             <td>{{ book.default_code if book.default_code else '-' }}</td>
+                             <td>{{ book.description if book.description else '-' }}</td>
+                             {# Ya no hay botón "Listo para Envío" aquí #}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+                <hr>
+
+                {# 2. SELECTOR DE DESTINO (FUERA DE LA TABLA, DENTRO DEL FORM) #}
+                <div class="form-group" style="margin-top: 20px;">
+                    <label for="destination_location_id"><strong>Destino del Envío:</strong></label>
+                    <select name="destination_location_id" id="destination_location_id" required>
+                        <option value="">-- Selecciona una sucursal --</option>
+                        {# Pasaremos los IDs de las ubicaciones destino desde Flask en el futuro, #}
+                        {# pero por AHORA ponemos los valores directamente aquí. ¡RECUERDA PASARLOS DESDE PYTHON LUEGO! #}
+                        <option value="29">EC - Quito</option>
+                        <option value="34">VEN - Canaima Amazonas</option>
+                        <option value="35">VEN - Andes (Tachira)</option>
+                        <option value="32">Sucursal Ginebra (Suiza)</option> {# Añadimos Ginebra como opción #}
+                        {# Añadir más opciones si hay más destinos #}
+                    </select>
+                </div>
+
+                {# 3. BOTÓN PARA CREAR EL ENVÍO DEL LOTE #}
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">📦 Crear Envío de Lote Seleccionado</button>
+                </div>
+
+            {% elif not error_message %}
+                 <p class="no-items">No hay libros aprobados pendientes de preparar para envío.</p>
+            {% endif %}
+
+            {# Botón volver fuera del if/else, pero dentro del form por si acaso se necesita #}
+            <div class="form-actions" style="text-align: left; border-top: none; margin-top: 10px;">
+                 <a href="{{ url_for('main.index') }}" class="btn">Volver a Inicio</a>
+             </div>
+
+        </form> {# === FIN DEL FORMULARIO === #}
+
     </div>
 </body>
 </html>

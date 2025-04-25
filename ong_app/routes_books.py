@@ -765,3 +765,170 @@ def mark_delivered(book_id):
     # Redirigir siempre de vuelta a la GESTIÓN DE ENVÍOS
     # El libro YA NO aparecerá aquí si tuvo éxito, porque la vista filtra por tags EN pipeline
     return redirect(url_for('books.shipping_management'))
+
+
+# --- NUEVA RUTA: Crear Envío de Lote (stock.picking) ---
+
+@books_bp.route('/create_batch_shipment', methods=['POST'])
+def create_batch_shipment():
+    """
+    Procesa la creación de una transferencia de lote (stock.picking) en Odoo.
+    Recibe los IDs de los libros seleccionados y el ID de la ubicación destino.
+    """
+    logging.info("[books_bp POST /create_batch_shipment] Solicitud recibida para crear envío de lote.")
+
+    # 1. Obtener datos del formulario
+    # getlist obtiene todos los valores de checkboxes con el mismo 'name'
+    selected_book_ids_str = request.form.getlist('selected_book_ids')
+    destination_location_id_str = request.form.get('destination_location_id')
+
+    logging.debug(f"IDs de libros seleccionados (str): {selected_book_ids_str}")
+    logging.debug(f"ID de ubicación destino (str): {destination_location_id_str}")
+
+    # 2. Validaciones básicas
+    if not selected_book_ids_str:
+        flash('Error: No se seleccionó ningún libro para el envío.', 'error')
+        return redirect(url_for('books.approved_books')) # Volver a la página de selección
+
+    if not destination_location_id_str:
+        flash('Error: No se seleccionó ninguna ubicación de destino.', 'error')
+        return redirect(url_for('books.approved_books'))
+
+    # Convertir IDs a enteros
+    try:
+        # Convertimos la lista de strings a lista de integers
+        selected_book_ids = [int(id_str) for id_str in selected_book_ids_str]
+        destination_location_id = int(destination_location_id_str)
+        logging.info(f"Libros a enviar (IDs): {selected_book_ids}")
+        logging.info(f"Ubicación destino ID: {destination_location_id}")
+    except ValueError:
+        flash('Error: IDs de libro o destino inválidos.', 'error')
+        logging.error(f"Error al convertir IDs: books={selected_book_ids_str}, dest={destination_location_id_str}")
+        return redirect(url_for('books.approved_books'))
+
+    # --- IDs de Configuración Odoo (necesitamos definirlos como constantes arriba o pasarlos) ---
+    # ¡¡¡ASEGÚRATE DE TENER ESTOS IDS CORRECTOS!!!
+    SOURCE_LOCATION_ID = 30          # ID de 'Stock Libros Aprobados ONG'
+    OPERATION_TYPE_ID_ENVIO = 7    # ID de 'Envíos a Sucursales' / 'Branch Shipments'
+    # ---------------------------------------------------------------------------------------
+
+    client = get_odoo_client()
+    if not client:
+        flash('Error conexión Odoo. No se pudo crear el envío.', 'error')
+        return redirect(url_for('books.approved_books'))
+
+    new_picking_id = None # Para guardar el ID de la transferencia creada
+    try:
+        # 3. Preparar datos para crear el stock.picking
+        logging.info("Preparando datos para crear 'stock.picking'...")
+
+        # Modelo de Odoo para transferencias
+        PickingModel = client.env['stock.picking']
+
+        # === Construcción de las líneas de movimiento (move_ids_without_package) ===
+        # Odoo espera una lista de operaciones, (0, 0, {valores}) para crear nuevas líneas
+        move_lines_data = []
+        logging.info(f"Creando líneas de movimiento para {len(selected_book_ids)} libros...")
+        # Necesitamos obtener el nombre de cada libro para la descripción del movimiento (opcional pero útil)
+        try:
+             books_data = client.env['product.product'].read(selected_book_ids, ['name'])
+             # Crear un diccionario id -> nombre para buscar fácil
+             book_names = {book['id']: book['name'] for book in books_data}
+        except Exception as read_err:
+             logging.warning(f"No se pudieron leer los nombres de los libros: {read_err}. Se usará nombre genérico.", exc_info=True)
+             book_names = {} # Diccionario vacío
+
+        for book_id in selected_book_ids:
+            book_name_for_move = book_names.get(book_id, f"Libro ID {book_id}") # Usa el nombre si lo encontró
+            line = (0, 0, {
+                'name': book_name_for_move, # Descripción de la línea
+                'product_id': book_id,       # El ID del libro a mover
+                'product_uom_qty': 1,        # Cantidad: 1 por ahora (asumimos 1 copia por libro)
+                'product_uom': 1,            # ID de Unidad de Medida (normalmente 1 para Unidades)
+                'location_id': SOURCE_LOCATION_ID,       # Ubicación Origen FIJA
+                'location_dest_id': destination_location_id, # Ubicación Destino del formulario
+            })
+            move_lines_data.append(line)
+            logging.debug(f"  Añadida línea para book_id {book_id}: {line}")
+        # =============================================================================
+
+        # Datos principales (cabecera) de la transferencia (stock.picking)
+        picking_data = {
+            'picking_type_id': OPERATION_TYPE_ID_ENVIO,   # ID del Tipo de Operación "Envíos a Sucursales"
+            'location_id': SOURCE_LOCATION_ID,            # ID Ubicación Origen
+            'location_dest_id': destination_location_id, # ID Ubicación Destino
+            'origin': 'Envío Lote desde App Flask ONG',   # Un texto para saber de dónde vino
+            'move_ids_without_package': move_lines_data,  # Las líneas de los productos a mover
+            # 'state': 'draft', # Odoo lo pone en draft por defecto al crear así
+            # Podrían necesitarse otros campos según configuración estricta de Odoo
+        }
+        logging.info("Datos para crear 'stock.picking' preparados.")
+        logging.debug(f"Picking Data: {picking_data}")
+
+        # 4. Ejecutar la creación en Odoo
+        logging.info("Intentando crear 'stock.picking' en Odoo...")
+        new_picking_id_list = PickingModel.create([picking_data]) # Create espera una lista
+
+        if new_picking_id_list:
+             new_picking_id = new_picking_id_list[0] # Obtenemos el ID de la lista
+             logging.info(f"¡Éxito! Transferencia (stock.picking) creada con ID: {new_picking_id} !")
+             
+             # LEER el nombre/referencia de la transferencia creada (ej: WH/OUT/00005)
+             picking_ref = ""
+             try:
+                picking_info = PickingModel.read(new_picking_id, ['name'])
+                if picking_info: picking_ref = picking_info[0].get('name', '')
+             except Exception: pass # No crítico si no podemos leer el nombre
+             
+             flash(f'Envío de lote creado con éxito en Odoo (Referencia: {picking_ref or new_picking_id}).', 'success')
+
+             # ----- IMPORTANTE: QUITAR TAG 'Approved' de los libros enviados -----
+             # Ahora que se creó el envío, debemos quitar la etiqueta 'Approved' (ID 5)
+             # de los libros incluidos para que no aparezcan más en la lista de preparación.
+             try:
+                  logging.info(f"Quitando tag 'Approved' (ID {TAG_ID_APROBADO}) de los libros enviados: {selected_book_ids}")
+                  templates_to_update = []
+                  # Necesitamos los IDs de los templates asociados a los products
+                  product_infos = client.env['product.product'].read(selected_book_ids, ['product_tmpl_id'])
+                  if product_infos:
+                      templates_to_update = [p['product_tmpl_id'][0] for p in product_infos if p.get('product_tmpl_id')]
+                      # Quitar duplicados si varios libros eran del mismo template (poco probable aquí)
+                      templates_to_update = list(set(templates_to_update)) 
+                      
+                      if templates_to_update:
+                          update_data = {'product_tag_ids': [(3, TAG_ID_APROBADO)]} # Desvincular Aprobado
+                          write_ok = client.env['product.template'].write(templates_to_update, update_data)
+                          if write_ok:
+                              logging.info(f"Tag 'Approved' quitado de los templates: {templates_to_update}")
+                          else:
+                              logging.warning(f"Odoo no confirmó el quitado del tag Approved para templates {templates_to_update}")
+                              flash('Advertencia: No se pudo quitar la etiqueta "Aprobado" de los libros enviados. Podrían reaparecer.', 'warning')
+                      else:
+                           logging.warning("No se encontraron IDs de template válidos para quitar etiqueta.")
+             except Exception as tag_err:
+                  logging.error(f"Error al intentar quitar tag 'Approved' de libros enviados: {tag_err}", exc_info=True)
+                  flash('Advertencia: Hubo un error al actualizar el estado de los libros enviados en la lista de preparación.', 'warning')
+             # ---------------------------------------------------------------------
+
+        else:
+             # Raro si no hay error RPC
+             logging.error("Odoo 'stock.picking.create' no devolvió ID pero no hubo excepción.")
+             flash('Se intentó crear el envío, pero Odoo no devolvió confirmación.', 'error')
+             return redirect(url_for('books.approved_books'))
+
+
+    except odoorpc.error.RPCError as e:
+        logging.error(f"[books_bp POST /create_batch_shipment] Error RPC Odoo: {e}", exc_info=True)
+        error_details = str(getattr(e, 'fault', e))
+        flash(f'Error de Odoo al crear envío ({type(e).__name__}): {error_details}', 'error')
+        return redirect(url_for('books.approved_books')) # Volver para corregir
+    except Exception as e:
+        logging.error(f"[books_bp POST /create_batch_shipment] Error inesperado: {e}", exc_info=True)
+        flash(f'Error inesperado del servidor al crear envío: {e}', 'error')
+        return redirect(url_for('books.approved_books'))
+
+    # 5. Redirigir a una página apropiada tras el éxito
+    # Podríamos redirigir a la lista de aprobados (donde ahora faltarán esos libros)
+    # o MEJOR AÚN, a la página de gestión de envíos/pipeline para ver la nueva transferencia.
+    # Asumimos que 'shipping_management' es la vista para ver transferencias (¡Aún no la hemos adaptado para eso!)
+    return redirect(url_for('books.shipping_management'))
