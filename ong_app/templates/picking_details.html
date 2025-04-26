@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detalle Envío {{ picking.name if picking else 'N/E' }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        {% if picking %}
+            <h1>Detalle Envío: {{ picking.name }}</h1>
+            <div class="shipment-header-details" style="margin-bottom: 20px; padding: 15px; background-color:#f8f9fa; border: 1px solid #eee; border-radius: 5px;">
+                <p><strong>Estado Odoo:</strong> {{ picking.state }}</p>
+                <p><strong>Origen:</strong> {{ picking.location_id[1] if picking.location_id else 'N/A' }}</p>
+                <p><strong>Destino:</strong> {{ picking.location_dest_id[1] if picking.location_dest_id else 'N/A' }}</p>
+                <p><strong>Fecha Prevista:</strong> {{ picking.scheduled_date if picking.scheduled_date else '-' }}</p>
+                {% if picking.origin %}
+                <p><strong>Origen Documento:</strong> {{ picking.origin }}</p>
+                {% endif %}
+            </div>
+        {% else %}
+            <h1>Detalle de Envío</h1>
+            <p class="error-msg">No se pudieron cargar los datos principales del envío.</p>
+        {% endif %}
+
+        <!-- Mensajes Flash y Error -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                 <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                 </div>
+            {% endif %}
+        {% endwith %}
+        {% if error_message %}
+            <p class="error-msg">Error al cargar líneas: {{ error_message }}</p>
+        {% endif %}
+
+        {# Formulario para enviar cantidades hechas y validar #}
+        {# ¡¡ACCIÓN TEMPORALMENTE APUNTANDO A # !! #}
+        <form action="#" method="POST">
+        {# El action correcto será: action="{{ url_for('books.process_validate_shipment', picking_id=(picking.id if picking else 0)) }}" #}
+
+            <h2>Libros a Enviar:</h2>
+            {# Verificamos si HAY líneas Y SI NO hay error de carga para mostrar tabla #}
+            {% if lines and not error_message %}
+                <table class="table-standard">
+                    <thead>
+                        <tr>
+                            <th>Libro (Producto)</th>
+                            <th style="width: 100px; text-align: right;">Cant. Demandada</th>
+                            <th style="width: 150px;">Cant. Hecha (Done)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                         {% for line in lines %} {# Bucle sobre las líneas (stock.move) #}
+                         <tr>
+                             <td>
+                                 {# Muestra nombre e ID del producto #}
+                                 {{ line.product_id[1] if line.product_id else 'Producto Desconocido' }} 
+                                 (ID Prod: {{ line.product_id[0] if line.product_id else 'N/A' }})
+                             </td>
+                             <td style="text-align: right;">
+                                 {# Muestra Cantidad Demandada (product_uom_qty) y Unidad de Medida #}
+                                 {{ "%.0f"|format(line.product_uom_qty) }} {# Formato sin decimales para libros #}
+                                 {{ line.product_uom[1] if line.product_uom else '' }}
+                             </td>
+                             <td>
+                                 {# Input para Cantidad Hecha (qty_done) #}
+                                 <input type="number" name="qty_done_{{ line.id }}" {# Name incluye ID del stock.move #}
+                                        value="{{ "%.0f"|format(line.product_uom_qty) }}" {# Pre-rellena con demandada, sin decimales #}
+                                        step="1" min="0" required
+                                        style="width: 100px; text-align: right; padding: 5px;">
+                                 {# Input oculto con el ID del stock.move #}
+                                 <input type="hidden" name="move_id" value="{{ line.id }}">
+                             </td>
+                         </tr>
+                         {% endfor %} {# Fin del bucle sobre las líneas #}
+                     </tbody>
+                </table>
+
+                {# Botones dentro del if lines #}
+                <div class="form-actions">
+                     <button type="submit" class="btn btn-success">✔️ Confirmar Cantidades y Validar Envío (WIP)</button>
+                     <a href="{{ url_for('books.shipping_management') }}" class="btn">Cancelar / Volver a Lista</a>
+                </div>
+
+            {# Si no hay líneas pero NO hubo error de carga #}
+            {% elif not error_message %}
+                <p class="no-items">No se encontraron libros (líneas de movimiento) en esta transferencia.</p>
+                 <div class="form-actions" style="text-align: left; border-top: none; margin-top: 10px;">
+                     <a href="{{ url_for('books.shipping_management') }}" class="btn">Volver a Lista</a>
+                 </div>
+             {# Si hubo error de carga (error_message tiene valor) #}
+             {# No necesitamos 'else' aquí porque el error ya se muestra arriba #}
+            {% endif %} {# Fin del if lines #}
+
+        </form> {# Fin del formulario de validación #}
+    </div>
+</body>
+</html>

@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestión de Envío - ONG</title>
+    <title>Gestión de Envíos - ONG</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="container">
-        <h1>Gestión de Envío Logístico</h1>
-        <p>Libros listos para enviar o actualmente en tránsito.</p>
+        <h1>Gestión de Envíos (Transferencias)</h1>
+        <p>Lista de envíos de lote creados. Desde aquí puedes confirmar y validar los envíos.</p>
 
         <!-- Mensajes Flash y Error -->
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -22,73 +22,74 @@
             {% endif %}
         {% endwith %}
         {% if error_message %}
-            <p class="error-msg">Error al cargar: {{ error_message }}</p>
+            <p class="error-msg">Error al cargar la lista de envíos: {{ error_message }}</p>
         {% endif %}
 
-        <!-- Tabla del Pipeline -->
-        {% if books %}
-            <table>
+        <!-- Tabla de Transferencias -->
+        {% if shipments %}
+            <table class="table-standard">
                 <thead>
                     <tr>
-                        <th>ID</th>
-                        <th>Título</th>
-                        <th>ISBN</th>
-                        <th>Estado Actual</th>
-                        <th>Acciones</th>
+                        <th>Referencia</th>
+                        <th>Fecha Prevista</th>
+                        <th>Origen</th>
+                        <th>Destino</th>
+                        <th>Estado Odoo</th>
+                        <th style="min-width: 180px;">Acciones</th> {# Ancho mínimo para botones #}
                     </tr>
                 </thead>
                 <tbody>
-                    {% for book in books %}
+                    {% for shipment in shipments %}
                     <tr>
-                        <td>{{ book.id }}</td>
-                        <td>{{ book.name }}</td>
-                        <td>{{ book.default_code if book.default_code else '-' }}</td>
+                        <td>{{ shipment.name }} (ID: {{ shipment.id }})</td>
+                        <td>{{ shipment.scheduled_date if shipment.scheduled_date else '-'}}</td>
+                        <td>{{ shipment.location_id[1] if shipment.location_id else 'N/A' }}</td>
+                        <td>{{ shipment.location_dest_id[1] if shipment.location_dest_id else 'N/A' }}</td>
                         <td>
-                            {# Determinar estado basado en los tags presentes #}
-                            {% if TAG_ID_READY in book.product_tag_ids %}
-                                <span style="color: orange; font-weight: bold;">Listo para Envío</span>
-                            {% elif TAG_ID_TRANSIT_EC in book.product_tag_ids %}
-                                <span style="color: blue; font-weight: bold;">En Tránsito (Ecuador)</span>
-                            {% elif TAG_ID_TRANSIT_VE in book.product_tag_ids %}
-                                <span style="color: #ff5733; font-weight: bold;">En Tránsito (Venezuela)</span>
-                            {% elif TAG_ID_TRANSIT_GENERAL in book.product_tag_ids %}
-                                <span style="color: purple; font-weight: bold;">En Tránsito (General)</span>
-                            {% else %}
-                                <span style="color: grey;">Estado Desconocido</span>
+                            {# Poner estilo simple según el estado #}
+                            {% set state_style = 'color: grey;' %}
+                            {% if shipment.state == 'draft' %}
+                                {% set state_style = 'color: #6c757d; font-style: italic;' %} {# Gris/itálica para borrador #}
+                            {% elif shipment.state == 'waiting' or shipment.state == 'confirmed' %}
+                                {% set state_style = 'color: #17a2b8;' %} {# Azul claro para espera/confirmado #}
+                            {% elif shipment.state == 'assigned' or shipment.state == 'ready' %}
+                                {% set state_style = 'color: orange; font-weight: bold;' %} {# Naranja/negrita para listo/asignado #}
+                            {% elif shipment.state == 'done' %}
+                                {% set state_style = 'color: green; font-weight: bold;' %} {# Verde/negrita para completado #}
+                            {% elif shipment.state == 'cancel' %}
+                                {% set state_style = 'color: red; text-decoration: line-through;' %} {# Rojo/tachado para cancelado #}
                             {% endif %}
+                            <span style="{{ state_style }}">{{ shipment.state }}</span>
                         </td>
+                        {# === CELDA DE ACCIONES ÚNICA Y CORRECTA === #}
                         <td class="actions-cell">
-                            {# Acciones condicionales según el estado #}
-
-                            {# --- Si está LISTO PARA ENVÍO (Tag ID 7) --- #}
-                            {% if TAG_ID_READY in book.product_tag_ids %}
-                                {# Botón para enviar a Ecuador (apunta a ruta que crearemos) #}
-                                <form action="{{ url_for('books.mark_in_transit', destination_tag_id=TAG_ID_TRANSIT_EC, book_id=book.id) }}" method="POST" style="display: inline; margin-bottom: 5px;">
-                                    <button type="submit" class="btn btn-success" title="Marcar como En Tránsito a Ecuador">🇪🇨 Enviar ECU</button>
-                                </form>
-                                {# Botón para enviar a Venezuela (apunta a ruta que crearemos) #}
-                                 <form action="{{ url_for('books.mark_in_transit', destination_tag_id=TAG_ID_TRANSIT_VE, book_id=book.id) }}" method="POST" style="display: inline;">
-                                    <button type="submit" class="btn btn-info" title="Marcar como En Tránsito a Venezuela">🇻🇪 Enviar VEN</button> {# Usamos btn-info para diferenciar #}
+                            {# --- Botón CONFIRMAR (si está en draft) --- #}
+                            {% if shipment.state == 'draft' %}
+                                <form action="{{ url_for('books.confirm_shipment', picking_id=shipment.id) }}" method="POST" style="display: inline; margin-right: 5px;">
+                                    <button type="submit" class="btn btn-info" title="Confirma la transferencia para pasarla a 'Esperando Disponibilidad'">➡️ Confirmar</button>
                                 </form>
                             {% endif %}
 
-                            {# --- Si está EN TRÁNSITO (Cualquiera de los IDs de tránsito) --- #}
-                            {% if TAG_ID_TRANSIT_EC in book.product_tag_ids or
-                                  TAG_ID_TRANSIT_VE in book.product_tag_ids or
-                                  TAG_ID_TRANSIT_GENERAL in book.product_tag_ids %}
-                                {# Botón para marcar como entregado (apunta a ruta que crearemos) #}
-                                <form action="{{ url_for('books.mark_delivered', book_id=book.id) }}" method="POST" style="display: inline;">
-                                    <button type="submit" class="btn btn-primary" title="Confirmar que el libro ha sido entregado">✅ Entregado</button>
+                            {# --- Botón VALIDAR (si está listo/confirmado/etc.) --- #}
+                            {% if shipment.state in ['assigned', 'ready', 'confirmed', 'waiting'] %}
+                                <form action="{{ url_for('books.validate_shipment', picking_id=shipment.id) }}" method="POST" style="display: inline;">
+                                    <button type="submit" class="btn btn-success" title="Abrir detalles para especificar cantidades y validar">✔️ Validar / Detallar</button>
                                 </form>
+                            {# --- Texto si ya está hecho o cancelado --- #}
+                            {% elif shipment.state == 'done' %}
+                                <span style="color: green; font-weight: bold;">✅ Completado</span>
+                            {% elif shipment.state == 'cancel' %}
+                                <span style="color: red;">❌ Cancelado</span>
                             {% endif %}
-
+                            {# Ya no se muestra nada extra para 'draft' aquí #}
                         </td>
+                        {# === FIN DE LA CELDA DE ACCIONES === #}
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         {% elif not error_message %}
-             <p class="no-items">No hay libros en el pipeline de envío actualmente.</p>
+             <p class="no-items">No hay envíos de lote creados que mostrar.</p>
         {% endif %}
 
         <hr>

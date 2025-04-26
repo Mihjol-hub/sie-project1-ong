@@ -562,73 +562,76 @@ def mark_ready_for_shipment(book_id):
 
 # --- NUEVA RUTA: Vista del Pipeline Logístico ---
 
-@books_bp.route('/shipping_management')
-def shipping_management():
+@books_bp.route('/shipping_management') # Mantenemos la ruta
+def shipping_management(): # Mantenemos nombre función
     """
-    Muestra los libros que están actualmente en el flujo logístico
-    (Listos para Envío, En Tránsito).
+    Muestra una lista de las Transferencias (stock.picking) creadas
+    para los envíos a sucursales (Tipo de Operación ID 7).
     """
-    shipping_books_list = []
+    shipments_list = [] # Lista para guardar las transferencias leídas
     error_message = None
 
-    # IDs de las etiquetas que indican que un libro está EN el pipeline
-    # Incluimos Ready (7), In Transit EC(10), In Transit VE(11), y In Transit General (8)
-    # NO incluimos Delivered (9) porque esos ya salieron del pipeline activo.
-    PIPELINE_TAG_IDS = [
-        TAG_ID_LOGISTICS_READY,
-        TAG_ID_LOGISTICS_TRANSIT_EC,
-        TAG_ID_LOGISTICS_TRANSIT_VE,
-        8 # ID de 'Logistics: In Transit' General
-    ]
-    logging.info(f"[books_bp GET /shipping_management] Buscando libros con etiquetas de pipeline: {PIPELINE_TAG_IDS}")
+    # ID del Tipo de Operación que queremos listar
+    OPERATION_TYPE_ID_ENVIO = 7 # 'Branch Shipments'
+    logging.info(f"[books_bp GET /shipping_management] Buscando transferencias (stock.picking) de tipo ID={OPERATION_TYPE_ID_ENVIO}")
 
     client = get_odoo_client()
     if not client:
-        flash('Error conexión Odoo. No se puede mostrar el pipeline de envío.', 'error')
+        flash('Error conexión Odoo. No se puede mostrar la lista de envíos.', 'error')
         error_message = "Error de conexión con Odoo."
     else:
         try:
-            # Buscamos productos que tengan CUALQUIERA de las etiquetas del pipeline
-            search_domain = [('product_tag_ids', 'in', PIPELINE_TAG_IDS)]
-            logging.debug(f"Dominio de búsqueda: {search_domain}")
+            PickingModel = client.env['stock.picking']
 
-            product_ids = client.env['product.product'].search(search_domain, limit=100, order="name asc")
-            logging.info(f"IDs de productos en pipeline encontrados: {product_ids}")
+            # Dominio de búsqueda: SOLO las transferencias de nuestro tipo
+            search_domain = [('picking_type_id', '=', OPERATION_TYPE_ID_ENVIO)]
 
-            if product_ids:
-                # Leemos campos, incluyendo 'product_tag_ids' para saber el estado actual
-                fields_to_read = ['id', 'name', 'default_code', 'description', 'product_tag_ids']
-                shipping_books_list = client.env['product.product'].read(product_ids, fields_to_read)
-                logging.info(f"Datos de {len(shipping_books_list)} libros en pipeline leídos.")
-                
-                # (Opcional) Podríamos añadir lógica aquí para determinar el estado exacto
-                # (Ready, Transit EC, Transit VE) basado en los IDs de tags leídos,
-                # pero lo haremos más fácil en la plantilla Jinja por ahora.
+            # Campos que queremos leer de cada transferencia
+            # 'name' es la referencia (ej: BS/00001)
+            # 'state' es el estado (draft, waiting, confirmed, assigned, done, cancel)
+            # 'origin' es el texto que pusimos al crearla
+            # 'location_id' y 'location_dest_id' nos darán el origen/destino (vienen como [id, 'Nombre'])
+            # 'scheduled_date' es la fecha prevista (Odoo la pone automáticamente)
+            fields_to_read = [
+                'id', 'name', 'state', 'origin',
+                'location_id', 'location_dest_id', 'scheduled_date'
+            ]
+            # Ordenar por ID descendente para ver las más nuevas primero
+            order = 'id desc'
 
-            else:
-                logging.info("No se encontraron libros en el pipeline de envío.")
-                if not error_message:
-                    flash('No hay libros actualmente en proceso de envío.', 'info')
+            logging.debug(f"Dominio: {search_domain}, Campos: {fields_to_read}")
+            shipments_list = PickingModel.search_read(
+                search_domain,
+                fields=fields_to_read,
+                order=order,
+                limit=50 # Limitar por si hay muchas
+            )
+            logging.info(f"Se encontraron {len(shipments_list)} transferencias de envío.")
+
+            if not shipments_list and not error_message:
+                flash('No hay envíos de lote registrados todavía.', 'info')
 
         except odoorpc.error.RPCError as e:
-            logging.error(f"[books_bp GET /shipping_pipeline] Error RPC: {e}", exc_info=True)
-            error_message = f"Error RPC Odoo al buscar libros en pipeline: {e}"
+            logging.error(f"[books_bp GET /shipping_management] Error RPC: {e}", exc_info=True)
+            error_message = f"Error RPC Odoo al buscar envíos: {e}"
             flash(error_message, 'error')
         except Exception as e:
-            logging.error(f"[books_bp GET /shipping_pipeline] Error inesperado: {e}", exc_info=True)
-            error_message = f"Error inesperado al buscar libros en pipeline: {e}"
+            logging.error(f"[books_bp GET /shipping_management] Error inesperado: {e}", exc_info=True)
+            error_message = f"Error inesperado al buscar envíos: {e}"
             flash(error_message, 'error')
 
-    # Renderizar la nueva plantilla
+    # Renderizar la misma plantilla, pero ahora le pasamos la lista de *transferencias*
+    # La plantilla tendrá que ser adaptada para mostrar esta nueva información.
+    # ¡¡OJO!! El nombre de la variable que pasamos A LA PLANTILLA sigue siendo 'books'
+    # por compatibilidad temporal con la plantilla existente. LO CAMBIAREMOS EN EL SIGUIENTE PASO.
+    # Es mejor renombrar ahora para claridad:
     return render_template('shipping_management.html',
-                           books=shipping_books_list, # La plantilla esperará 'books'
-                           # Pasamos los IDs de los tags a la plantilla para lógica condicional
-                           TAG_ID_READY = TAG_ID_LOGISTICS_READY,
-                           TAG_ID_TRANSIT_EC = TAG_ID_LOGISTICS_TRANSIT_EC,
-                           TAG_ID_TRANSIT_VE = TAG_ID_LOGISTICS_TRANSIT_VE,
-                           TAG_ID_TRANSIT_GENERAL = 8,
+                           shipments=shipments_list, # <--- CAMBIO: Nombre de variable pasado a la plantilla
+                           # Ya no pasamos los TAG_IDs porque la lógica se basará en el 'state'
                            error_message=error_message)
-    
+
+
+
 # --- NUEVA RUTA LOGÍSTICA: Marcar como En Tránsito (POST) ---
 
 @books_bp.route('/mark_in_transit/<int:destination_tag_id>/<int:book_id>', methods=['POST'])
@@ -932,3 +935,138 @@ def create_batch_shipment():
     # o MEJOR AÚN, a la página de gestión de envíos/pipeline para ver la nueva transferencia.
     # Asumimos que 'shipping_management' es la vista para ver transferencias (¡Aún no la hemos adaptado para eso!)
     return redirect(url_for('books.shipping_management'))
+
+# --- NUEVA RUTA: Confirmar Transferencia de Envío (POST) ---
+
+@books_bp.route('/confirm_shipment/<int:picking_id>', methods=['POST'])
+def confirm_shipment(picking_id):
+    """
+    Ejecuta la acción 'action_confirm' en una transferencia (stock.picking)
+    para pasarla del estado 'draft' a 'waiting' o 'confirmed'.
+    """
+    logging.info(f"[books_bp POST /confirm_shipment] Solicitud para CONFIRMAR transferencia ID: {picking_id}")
+    client = get_odoo_client()
+    if not client:
+        flash('Error conexión Odoo.', 'error')
+        return redirect(url_for('books.shipping_management'))
+
+    try:
+        PickingModel = client.env['stock.picking']
+        logging.info(f"Llamando a 'action_confirm' para picking ID {picking_id}")
+        # El método action_confirm no suele necesitar argumentos extra aquí
+        PickingModel.action_confirm([picking_id]) # Odoo 16 a menudo necesita lista de IDs
+        logging.info(f"¡Transferencia {picking_id} confirmada (o intento enviado)!")
+        # Leemos el nombre/ref para el mensaje
+        picking_ref = ""
+        try:
+            picking_info = PickingModel.read(picking_id, ['name'])
+            if picking_info: picking_ref = picking_info[0].get('name', '')
+        except Exception: pass
+        flash(f'Transferencia {picking_ref or picking_id} confirmada.', 'success')
+
+    except odoorpc.error.RPCError as e:
+        logging.error(f"[books_bp POST /confirm_shipment] Error RPC: {e}", exc_info=True)
+        flash(f'Error RPC Odoo al confirmar transferencia {picking_id}: {e}', 'error')
+    except Exception as e:
+        logging.error(f"[books_bp POST /confirm_shipment] Error inesperado: {e}", exc_info=True)
+        flash(f'Error inesperado al confirmar transferencia {picking_id}: {e}', 'error')
+
+    # Siempre redirigir de vuelta a la gestión de envíos para ver el cambio de estado
+    return redirect(url_for('books.shipping_management'))
+
+
+# --- RUTA ACTUALIZADA: REDIRIGE a mostrar detalles para validar ---
+
+@books_bp.route('/validate_shipment/<int:picking_id>', methods=['POST']) # Mantenemos POST por ahora por el form
+def validate_shipment(picking_id):
+    """
+    TEMPORALMENTE: Redirige a la página de detalles de la transferencia
+    para introducir cantidades hechas.
+    En el futuro, esta podría ser la función que PROCESA la validación.
+    Pero para empezar, solo redirige.
+    """
+    logging.info(f"[books_bp POST /validate_shipment] Redirigiendo a vista de detalles para picking ID: {picking_id}")
+    # Simplemente redirigimos a una NUEVA ruta GET que mostrará los detalles
+    # Usaremos el mismo picking_id
+    return redirect(url_for('books.show_picking_details', picking_id=picking_id))
+
+
+# --- NUEVA RUTA: Mostrar Detalles de una Transferencia (GET) ---
+
+@books_bp.route('/picking_details/<int:picking_id>') # Acepta GET por defecto
+def show_picking_details(picking_id):
+    """
+    Muestra los detalles de una transferencia específica, incluyendo las
+    líneas de movimiento (libros) para poder introducir cantidades hechas.
+    """
+    logging.info(f"[books_bp GET /picking_details] Mostrando detalles para picking ID: {picking_id}")
+
+    picking_data = None
+    move_lines = [] # Lista para las líneas/libros de esta transferencia
+    error_message = None
+
+    client = get_odoo_client()
+    if not client:
+        flash('Error conexión Odoo. No se pueden cargar detalles del envío.', 'error')
+        error_message = "Error de conexión con Odoo."
+        # Aún así intentaremos renderizar la plantilla con el error
+    else:
+            try:
+                PickingModel = client.env['stock.picking']
+                # Campos a leer de la cabecera de la transferencia
+                picking_fields = ['id', 'name', 'state', 'origin', 'location_id', 'location_dest_id', 'scheduled_date']
+                # Leer la información principal de la transferencia
+                picking_data_list = PickingModel.read(picking_id, fields=picking_fields)
+
+                if not picking_data_list:
+                    flash(f'Error: Transferencia con ID {picking_id} no encontrada.', 'error')
+                    # Es importante redirigir aquí si no se encuentra
+                    return redirect(url_for('books.shipping_management')) 
+
+                picking_data = picking_data_list[0] # Obtenemos el diccionario
+                logging.info(f"Datos de cabecera leídos para picking {picking_id}: {picking_data}")
+
+                # === INICIO DEL BLOQUE CORREGIDO: Leer stock.move (move_ids) ===
+                # Leer el campo 'move_ids' del picking (contiene los IDs de los stock.move)
+                # Hacemos una sola lectura para obtener tanto la cabecera como los move_ids
+                picking_with_moves = PickingModel.read(picking_id, ['move_ids'])
+                move_ids = []
+                if picking_with_moves and picking_with_moves[0].get('move_ids'):
+                    move_ids = picking_with_moves[0]['move_ids']
+            
+                logging.info(f"Buscando detalles de los movimientos (stock.move) IDs: {move_ids}")
+
+                if move_ids:
+                    MoveModel = client.env['stock.move']
+                    # Campos a leer de cada stock.move: 
+                    # ID del move, ID del producto, Cantidad Demandada, Unidad Medida, Estado del move
+                    line_fields = ['id', 'product_id', 'product_uom_qty', 'product_uom', 'state'] 
+                    move_lines = MoveModel.read(move_ids, fields=line_fields)
+                    logging.info(f"Datos de {len(move_lines)} movimientos (stock.move) leídos: {move_lines}")
+                    # Recordar: 'product_id' y 'product_uom' vienen como [ID, 'Nombre']
+                    #           'product_uom_qty' es la cantidad demandada.
+                # === FIN DEL BLOQUE CORREGIDO ===
+                else:
+                    # Log y mensaje si no se encuentran 'move_ids' asociados al picking
+                    logging.warning(f"La transferencia {picking_id} no parece tener movimientos asociados (move_ids). Verificar en Odoo.")
+                    flash('Advertencia: No se encontraron los libros asociados a esta transferencia (stock.move).', 'warning')
+
+            # Manejo de excepciones (Sin cambios aquí)
+            except odoorpc.error.RPCError as e:
+                logging.error(f"[books_bp GET /picking_details] Error RPC: {e}", exc_info=True)
+                error_message = f"Error RPC Odoo al cargar detalles del envío {picking_id}: {e}"
+                flash(error_message, 'error')
+                # Si falla la carga de datos, inicializar picking_data como None para evitar errores en render_template
+                picking_data = None 
+                move_lines = []
+            except Exception as e:
+                logging.error(f"[books_bp GET /picking_details] Error inesperado: {e}", exc_info=True)
+                error_message = f"Error inesperado al cargar detalles del envío {picking_id}: {e}"
+                flash(error_message, 'error')
+                picking_data = None
+            # Renderizar la nueva plantilla de detalles (Sin cambios aquí)
+            return render_template('picking_details.html',
+                            picking=picking_data, # Datos de cabecera
+                            lines=move_lines,     # Lista de líneas (libros) - ¡Ahora son stock.move!
+                            error_message=error_message)
+        
