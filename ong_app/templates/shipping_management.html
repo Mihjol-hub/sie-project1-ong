@@ -61,29 +61,36 @@
                             {% endif %}
                             <span style="{{ state_style }}">{{ shipment.state }}</span>
                         </td>
-                        {# === CELDA DE ACCIONES ÚNICA Y CORRECTA === #}
+                        {# === INICIO: CELDA DE ACCIONES CORREGIDA === #}
                         <td class="actions-cell">
-                            {# --- Botón CONFIRMAR (si está en draft) --- #}
+                            {# === Lógica de Botones FINAL con RESERVAR STOCK === #}
+
+                            {# --- 1. Botón CONFIRMAR (si está en draft) --- #}
                             {% if shipment.state == 'draft' %}
                                 <form action="{{ url_for('books.confirm_shipment', picking_id=shipment.id) }}" method="POST" style="display: inline; margin-right: 5px;">
-                                    <button type="submit" class="btn btn-info" title="Confirma la transferencia para pasarla a 'Esperando Disponibilidad'">➡️ Confirmar</button>
+                                    <button type="submit" class="btn btn-info" title="Confirma la transferencia para iniciar proceso">➡️ Confirmar</button>
                                 </form>
-                            {% endif %}
 
-                            {# --- Botón VALIDAR (si está listo/confirmado/etc.) --- #}
-                            {% if shipment.state in ['assigned', 'ready', 'confirmed', 'waiting'] %}
+                            {# --- 2. Botón RESERVAR STOCK (si está confirmado/esperando) --- #}
+                            {% elif shipment.state in ['confirmed', 'waiting'] %}
+                                <form action="{{ url_for('books.reserve_shipment', picking_id=shipment.id) }}" method="POST" style="display: inline; margin-right: 5px;">
+                                    <button type="submit" class="btn btn-warning" title="Intenta reservar el stock necesario para el envío">⏳ Reservar Stock</button>
+                                </form>
+
+                            {# --- 3. Botón VALIDAR/DETALLAR (si está asignado/listo) --- #}
+                            {% elif shipment.state in ['assigned', 'ready'] %}
                                 <form action="{{ url_for('books.validate_shipment', picking_id=shipment.id) }}" method="POST" style="display: inline;">
                                     <button type="submit" class="btn btn-success" title="Abrir detalles para especificar cantidades y validar">✔️ Validar / Detallar</button>
                                 </form>
+
                             {# --- Texto si ya está hecho o cancelado --- #}
                             {% elif shipment.state == 'done' %}
                                 <span style="color: green; font-weight: bold;">✅ Completado</span>
                             {% elif shipment.state == 'cancel' %}
                                 <span style="color: red;">❌ Cancelado</span>
                             {% endif %}
-                            {# Ya no se muestra nada extra para 'draft' aquí #}
                         </td>
-                        {# === FIN DE LA CELDA DE ACCIONES === #}
+                        {# === FIN: CELDA DE ACCIONES CORREGIDA === #}
                     </tr>
                     {% endfor %}
                 </tbody>
