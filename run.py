@@ -1,13 +1,12 @@
 # run.py
-from ong_app import create_app # Importa la factory
+from ong_app import create_app 
 
-app = create_app() # Crea la instancia de la app
+app = create_app() 
 
-if __name__ == '__main__': # Este bloque es clave
+if __name__ == '__main__': 
     import os
-    # ¿Está FLASK_DEBUG=1 en el entorno? Si no, lo toma de la config o default (off)
-    # El app.run() respeta el modo debug de la config de la app
+    
     debug_mode = app.config.get('DEBUG', False)
-    port = int(os.environ.get("PORT", 5000)) # Obtenemos el PUERTO INTERNO
-    # ¡Asegurar host='0.0.0.0'!
+    port = int(os.environ.get("PORT", 5000)) 
+   
     app.run(host='0.0.0.0', port=port, debug=debug_mode)

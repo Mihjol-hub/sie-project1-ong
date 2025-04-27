@@ -1,76 +1,86 @@
-# ong_app/routes_books.py 
-# (Asegúrate que Flask y otras dependencias estén importadas arriba)
+# ong_app/routes_books.py
+
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, jsonify
 from .odoo_connector import get_odoo_client
-from .odoo_inventory_utils import add_initial_stock_via_receipt 
+from .odoo_inventory_utils import add_initial_stock_via_receipt # Correct function imported
 import logging
 import odoorpc
 
-# --- DEFINIR LOS IDs REALES DE LAS ETIQUETAS (¡Actualizados!) ---
-TAG_ID_PENDIENTE = 4 
-TAG_ID_APROBADO  = 5 
-TAG_ID_RECHAZADO = 6 
-# --- CONSTANTES IDs DE TAGS LOGÍSTICAS ---
+# --- DEFINE ACTUAL TAG IDs (Updated!) ---
+
+TAG_ID_PENDIENTE = 4  # Renaming to TAG_ID_PENDING later might be good, but keeping for safety now
+TAG_ID_APROBADO  = 5  # Renaming to TAG_ID_APPROVED later might be good
+TAG_ID_RECHAZADO = 6  # Renaming to TAG_ID_REJECTED later might be good
+
+# --- CONSTANT IDs FOR LOGISTICS TAGS ---
+
 TAG_ID_LOGISTICS_READY = 7
 TAG_ID_LOGISTICS_TRANSIT_EC = 10
 TAG_ID_LOGISTICS_TRANSIT_VE = 11
 TAG_ID_LOGISTICS_DELIVERED = 9
 
-# (Podríamos usar el ID 8 'In Transit' genérico si quisiéramos simplificar más adelante)
-LIST_ALL_LOGISTICS_TAGS = [TAG_ID_LOGISTICS_READY, TAG_ID_LOGISTICS_TRANSIT_EC, 
+# (We could use the generic 'In Transit' ID 8 if we wanted to simplify later)
+LIST_ALL_LOGISTICS_TAGS = [TAG_ID_LOGISTICS_READY, TAG_ID_LOGISTICS_TRANSIT_EC,
                            TAG_ID_LOGISTICS_TRANSIT_VE, TAG_ID_LOGISTICS_DELIVERED, 8]
 
 
 books_bp = Blueprint('books', __name__)
 
-# --- Ruta para MOSTRAR el formulario de añadir libro (CON CARGA DE DONANTES) ---
-
+# --- Route to DISPLAY the add book form (WITH DONOR LOADING) ---
 @books_bp.route('/add_book', methods=['GET'])
 def add_book_form():
-    donors = [] # Inicializar como lista vacía
+    donors = [] # Initialize as an empty list
     error_message = None
 
     client = get_odoo_client()
     if not client:
-        flash('Error de conexión con Odoo. No se pueden cargar los donantes.', 'error')
-        error_message = "Error de conexión con Odoo al cargar donantes." # Mensaje más específico
-        # No hacemos return aquí todavía, para renderizar el form aunque sea sin donantes
+        # Flash message translated
+        flash('Odoo connection error. Donors cannot be loaded.', 'error')
+        # Error message translated
+        error_message = "Odoo connection error when loading donors." 
+        # We don't return here yet, to render the form even without donors
     else:
-        # Intentar obtener la lista de donantes SOLO si la conexión fue exitosa
+        # Try to get the donor list ONLY if the connection was successful
         try:
-            # Buscar partners de tipo 'persona' (asumiendo que son los donantes/voluntarios)
-            # Ordenamos por nombre ascendente para el desplegable
+            # Search for partners of type 'person' (assuming they are donors/volunteers)
+            # Sort by name ascending for the dropdown
             donor_ids = client.env['res.partner'].search(
-                [('company_type', '=', 'person')], 
-                limit=150,  # Aumentamos límite por si acaso
-                order="name asc" 
+                [('company_type', '=', 'person')],
+                limit=150,  # Increased limit just in case
+                order="name asc"
             )
-            logging.info(f"[books_bp GET /add_book] IDs de donantes encontrados: {donor_ids}")
-            
+            # Log message translated
+            logging.info(f"[books_bp GET /add_book] Donor IDs found: {donor_ids}")
+
             if donor_ids:
-                # Leer solo el ID y el nombre para el desplegable
+                # Read only ID and name for the dropdown
                 donors = client.env['res.partner'].read(donor_ids, ['id', 'name'])
-                logging.info(f"[books_bp GET /add_book] Datos de donantes (id, name) leídos: {len(donors)} encontrados.")
+                # Log message translated
+                logging.info(f"[books_bp GET /add_book] Donor data (id, name) read: {len(donors)} found.")
             else:
-                logging.info("[books_bp GET /add_book] No se encontraron partners tipo 'persona'.")
-                # Podríamos poner un flash info aquí si queremos, pero no es crítico
-                # flash('No hay donantes registrados para seleccionar.', 'info')
+                # Log message translated
+                logging.info("[books_bp GET /add_book] No partners of type 'person' found.")
+        
+                # flash('No registered donors found to select.', 'info')
 
         except odoorpc.error.RPCError as e:
-            logging.error(f"[books_bp GET /add_book] Error RPC al cargar donantes: {e}", exc_info=True)
-            error_message = f"Error RPC al cargar lista de donantes: {e}"
+            # Log message translated
+            logging.error(f"[books_bp GET /add_book] RPC Error loading donors: {e}", exc_info=True)
+            # Error message translated
+            error_message = f"RPC Error loading donor list: {e}"
             flash(error_message, 'error')
         except Exception as e:
-            logging.error(f"[books_bp GET /add_book] Error inesperado al cargar donantes: {e}", exc_info=True)
-            error_message = f"Error inesperado al cargar donantes: {e}"
+            # Log message translated
+            logging.error(f"[books_bp GET /add_book] Unexpected error loading donors: {e}", exc_info=True)
+            # Error message translated
+            error_message = f"Unexpected error loading donors: {e}"
             flash(error_message, 'error')
-            
-    # Renderizar SIEMPRE la plantilla, pasando la lista 'donors' (que estará llena o vacía)
+
+    # ALWAYS render the template, passing the 'donors' list (which will be full or empty)
     return render_template('add_book.html', donors=donors, error_message=error_message)
 
 
-# --- Ruta para PROCESAR el formulario de añadir libro ---
-
+# --- Route to PROCESS the add book form ---
 @books_bp.route('/add_book', methods=['POST'])
 def add_book_submit():
     title = request.form.get('title')
@@ -78,1014 +88,1266 @@ def add_book_submit():
     isbn = request.form.get('isbn')
     donor_id_str = request.form.get('donor_id')
 
-    # Constantes (sin cambios)
-    TARGET_STOCK_LOCATION_ID = 30 
-    INITIAL_STOCK_QTY = 1.0 # Es buena práctica usar float para cantidades en Odoo
+    # Constants (no changes)
+    TARGET_STOCK_LOCATION_ID = 30
+    # It's good practice to use float for Odoo quantities
+    INITIAL_STOCK_QTY = 1.0 
 
-    # Validación simple de título (sin cambios)
+    # Simple title validation (no changes)
     if not title:
-        flash('El título del libro es obligatorio.', 'error')
+        # Flash message translated
+        flash('Book title is mandatory.', 'error')
         return redirect(url_for('books.add_book_form'))
 
-    logging.info(f"[books_bp POST /add_book] Datos: T={title}, A={author}, I={isbn}, D={donor_id_str}")
-    
-    # Conexión a Odoo (sin cambios)
+    # Log message translated
+    logging.info(f"[books_bp POST /add_book] Data: T={title}, A={author}, I={isbn}, D={donor_id_str}")
+
+    # Odoo connection (no changes)
     client = get_odoo_client()
     if not client:
-        flash('Error de conexión con Odoo. No se pudo añadir el libro.', 'error')
+        # Flash message translated
+        flash('Odoo connection error. Could not add book.', 'error')
         return redirect(url_for('books.add_book_form'))
 
-    # --- Preparar info donante (sin cambios) ---
+    # --- Prepare donor info (no changes from your original code) ---
     donor_name = None
-    donor_info_text = ""
+    # Variable name is fine, translating the created string below
+    donor_info_text = "" 
     if donor_id_str:
         try:
             donor_id = int(donor_id_str)
-            logging.info(f"[books_bp] Buscando nombre para Donante ID: {donor_id}")
+            # Log message translated
+            logging.info(f"[books_bp] Searching name for Donor ID: {donor_id}")
             donor_data = client.env['res.partner'].read(donor_id, ['name'])
-            if donor_data and isinstance(donor_data, list): 
+            if donor_data and isinstance(donor_data, list):
                 donor_name = donor_data[0].get('name')
                 if donor_name:
-                    donor_info_text = f"Donante: {donor_name} (ID: {donor_id})"
-                    logging.info(f"[books_bp] Donante encontrado: {donor_name}")
+                    # String translated
+                    donor_info_text = f"Donor: {donor_name} (ID: {donor_id})"
+                    # Log message translated
+                    logging.info(f"[books_bp] Donor found: {donor_name}")
                 else:
-                    logging.warning(f"[books_bp] Donante ID {donor_id} leído pero sin nombre.")
+                    # Log message translated
+                    logging.warning(f"[books_bp] Donor ID {donor_id} read but no name found.")
             else:
-                 logging.warning(f"[books_bp] Donante ID {donor_id} no encontrado o devuelto inesperado: {donor_data}")
+                 # Log message translated
+                 logging.warning(f"[books_bp] Donor ID {donor_id} not found or unexpected return: {donor_data}")
         except ValueError:
-            logging.error(f"[books_bp] ID Donante '{donor_id_str}' inválido.")
-            flash("Error: El ID del donante seleccionado no es válido.", "error") 
+            # Log message translated
+            logging.error(f"[books_bp] Donor ID '{donor_id_str}' invalid.")
+            # Flash message translated (more useful)
+            flash("Error: The selected donor ID is invalid.", "error") 
             return redirect(url_for('books.add_book_form'))
-        except Exception as e: # Captura general para lectura de donante
-            logging.error(f"[books_bp] Error al leer donante {donor_id_str}: {e}", exc_info=True)
-            flash(f"Error interno al buscar información del donante: {e}", "error")
+        except Exception as e: # General catch for donor reading
+            # Log message translated
+            logging.error(f"[books_bp] Error reading donor {donor_id_str}: {e}", exc_info=True)
+            # Flash message translated
+            flash(f"Internal error searching for donor information: {e}", "error")
             return redirect(url_for('books.add_book_form'))
-            
-    # --- Crear libro en Odoo ---
-    new_book_id = None 
-    product_creation_successful = False # Flag para saber si el libro se creó
-    
-    try: # TRY PRINCIPAL PARA CREACIÓN LIBRO, TAG Y STOCK
-        
-        ProductModel = client.env['product.product'] 
-        
-        # Buscar duplicados (sin cambios)
+
+    # --- Create book in Odoo ---
+    new_book_id = None
+    # Flag to know if the book was created
+    product_creation_successful = False 
+
+    # MAIN TRY BLOCK FOR BOOK CREATION, TAG, AND STOCK
+    try: 
+        ProductModel = client.env['product.product']
+
+        # Search for duplicates (no changes)
         search_criteria = []
-        if isbn: 
+        if isbn:
              search_criteria.append(('default_code', '=', isbn))
-        elif title: 
+        elif title:
              search_criteria.append(('name', '=', title))
         existing_books_ids = ProductModel.search(search_criteria) if search_criteria else []
-        
-        if existing_books_ids:
-             logging.warning(f"[books_bp] Libro ya podría existir: {title}/{isbn}. IDs: {existing_books_ids}")
-             flash(f'El libro "{title}" (o su ISBN) ya existe en Odoo. No se ha creado duplicado.', 'warning')
-             # Importante salir aquí para no continuar al bloque de tag/stock
-             return redirect(url_for('books.add_book_form')) 
 
-        # Preparar datos libro (sin cambios)
-        logging.info("[books_bp] Libro no encontrado, creando...")
+        if existing_books_ids:
+             # Log message translated
+             logging.warning(f"[books_bp] Book might already exist: {title}/{isbn}. IDs: {existing_books_ids}")
+             # Flash message translated (clearer)
+             flash(f'The book "{title}" (or its ISBN) already exists in Odoo. Duplicate not created.', 'warning')
+             # Important to exit here to not continue to the tag/stock block
+             return redirect(url_for('books.add_book_form'))
+
+        # Prepare book data (no changes)
+        # Log message translated
+        logging.info("[books_bp] Book not found, creating...")
         description_parts = []
-        if author: description_parts.append(f"Autor: {author}")
+        # String translated
+        if author: description_parts.append(f"Author: {author}")
         if donor_info_text: description_parts.append(donor_info_text)
-        full_description = ". ".join(description_parts) if description_parts else False 
+        full_description = ". ".join(description_parts) if description_parts else False
 
         product_data = {
             'name': title,
-            'default_code': isbn if isbn else False, 
-            'description_sale': full_description, 
+            'default_code': isbn if isbn else False,
+            'description_sale': full_description,
             'standard_price': 0.0,
-            'list_price': 1.0, 
-            'type': 'product', 
-            'categ_id': 1,     
-            'uom_id': 1,       
-            'uom_po_id': 1,    
-            'sale_ok': False,  
-            'purchase_ok': False, 
+            'list_price': 1.0,
+            'type': 'product',
+            'categ_id': 1,
+            'uom_id': 1,
+            'uom_po_id': 1,
+            'sale_ok': False,
+            'purchase_ok': False,
         }
-        
-        # --- Intento de Crear el producto ---
+
+        # --- Attempt to Create the product ---
         new_book_id = ProductModel.create(product_data)
-        logging.info(f"[books_bp] Libro creado con ID (product.product): {new_book_id}!")
-        product_creation_successful = True # Marcar éxito de creación
-        
-        # === SI la creación fue exitosa, AHORA intentamos añadir Tag y Stock ===
+        # Log message translated
+        logging.info(f"[books_bp] Book created with ID (product.product): {new_book_id}!")
+        # Mark creation success
+        product_creation_successful = True 
+
+        # === IF creation was successful, NOW try to add Tag and Stock ===
         tag_added_successfully = False
         stock_added_successfully = False
 
-        if product_creation_successful: # Solo proceder si new_book_id es válido
-            # --- Bloque para añadir TAG PENDIENTE ---
+        # Only proceed if new_book_id is valid
+        if product_creation_successful: 
+            # --- Block to add PENDING TAG ---
             try:
                 product_info_tmpl = ProductModel.read(new_book_id, ['product_tmpl_id'])
                 if product_info_tmpl and product_info_tmpl[0].get('product_tmpl_id'):
                     template_id = product_info_tmpl[0]['product_tmpl_id'][0]
-                    logging.info(f"[books_bp] Producto ID={new_book_id} tiene Template ID={template_id}")
-                    update_data_template = {'product_tag_ids': [(4, TAG_ID_PENDIENTE)]} 
+                    # Log message translated
+                    logging.info(f"[books_bp] Product ID={new_book_id} has Template ID={template_id}")
+                    update_data_template = {'product_tag_ids': [(4, TAG_ID_PENDIENTE)]}
                     client.env['product.template'].write([template_id], update_data_template)
-                    logging.info(f"[books_bp] Etiqueta Pendiente (ID={TAG_ID_PENDIENTE}) añadida al Template ID={template_id}.")
-                    tag_added_successfully = True # Marcar éxito del tag
+                    # Log message translated
+                    logging.info(f"[books_bp] Pending Tag (ID={TAG_ID_PENDIENTE}) added to Template ID={template_id}.")
+                    # Mark tag success
+                    tag_added_successfully = True 
                 else:
-                    logging.warning(f"[books_bp] No se encontró template ID para Prod ID={new_book_id}. No se añadió etiqueta pendiente.")
-                    # No es un error fatal, podríamos continuar
+                    # Log message translated
+                    logging.warning(f"[books_bp] Template ID not found for Prod ID={new_book_id}. Pending tag not added.")
+                    # Not a fatal error, we could continue
 
             except Exception as e_tag:
-                logging.error(f"[books_bp] Error al añadir TAG para libro ID {new_book_id}: {e_tag}", exc_info=True)
-                # Mostrar advertencia, pero NO detener necesariamente el intento de añadir stock
-                flash(f'Libro "{title}" (ID: {new_book_id}) creado, pero falló al añadir la etiqueta Pendiente.', 'warning')
-                tag_added_successfully = False # Marcar fallo del tag
+                # Log message translated
+                logging.error(f"[books_bp] Error adding TAG for book ID {new_book_id}: {e_tag}", exc_info=True)
+                # Show warning, but don't necessarily stop the attempt to add stock
+                # Flash message translated
+                flash(f'Book "{title}" (ID: {new_book_id}) created, but failed to add the Pending tag.', 'warning')
+                # Mark tag failure
+                tag_added_successfully = False 
 
-           
-            # Siempre intentamos añadir stock si el libro se creó, incluso si falló el tag
+
+            # --- Block to add INITIAL STOCK (INDEPENDENT OF TAG) ---
+            # Always try to add stock if the book was created, even if the tag failed
             try:
-                logging.info(f"[books_bp] Intentando llamar add_initial_stock_via_receipt para ID {new_book_id}...")
-                stock_added_successfully = add_initial_stock_via_receipt(client, new_book_id, INITIAL_STOCK_QTY, TARGET_STOCK_LOCATION_ID) # <-- LLAMADA CORRECTA
+                # Log message translated
+                logging.info(f"[books_bp] Attempting to call add_initial_stock_via_receipt for ID {new_book_id}...")
+                # CORRECT FUNCTION CALL
+                stock_added_successfully = add_initial_stock_via_receipt(client, new_book_id, INITIAL_STOCK_QTY, TARGET_STOCK_LOCATION_ID) 
                 
                 if stock_added_successfully:
-                    logging.info(f"[books_bp] add_initial_stock_via_receipt para ID {new_book_id} DEVOLVIÓ True.")
-                    # Flash de éxito total se pondrá al final si ambos tag(o no crítico) y stock funcionaron
+                    # Log message translated
+                    logging.info(f"[books_bp] add_initial_stock_via_receipt for ID {new_book_id} RETURNED True.")
+                    # Total success flash message will be set at the end if both tag (or non-critical) and stock worked
                 else:
-                    # Si devuelve False SIN excepción
-                    logging.error(f"[books_bp] add_initial_stock_via_receipt para ID {new_book_id} DEVOLVIÓ False. ¡NO SE AÑADIÓ STOCK!")
-                    flash(f'Libro "{title}" (ID: {new_book_id}) creado, pero HUBO UN PROBLEMA registrando el stock inicial. Revisar logs y Odoo.', 'warning')
-            
-            except Exception as e_stock: 
-                # Si add_initial_stock_via_receipt lanza una EXCEPCIÓN
-                logging.error(f"[books_bp] EXCEPCIÓN al llamar add_initial_stock_via_receipt para libro ID {new_book_id}: {e_stock}", exc_info=True)
-                flash(f'Libro "{title}" (ID: {new_book_id}) creado, pero OCURRIÓ UN ERROR INESPERADO registrando stock inicial. Revisar logs.', 'danger')
-                stock_added_successfully = False # Asegurar que es False si hubo excepción
+                    # If it returns False WITHOUT exception
+                    # Log message translated
+                    logging.error(f"[books_bp] add_initial_stock_via_receipt for ID {new_book_id} RETURNED False. STOCK NOT ADDED!")
+                    # Flash message translated (set warning here if it returns False)
+                    flash(f'Book "{title}" (ID: {new_book_id}) created, but THERE WAS A PROBLEM registering the initial stock. Check logs and Odoo.', 'warning')
 
-            # --- Mensaje Flash Final Combinado ---
+            except Exception as e_stock:
+                # If add_initial_stock_via_receipt raises an EXCEPTION
+                # Log message translated
+                logging.error(f"[books_bp] EXCEPTION calling add_initial_stock_via_receipt for book ID {new_book_id}: {e_stock}", exc_info=True)
+                # Flash message translated
+                flash(f'Book "{title}" (ID: {new_book_id}) created, but an UNEXPECTED ERROR occurred registering initial stock. Check logs.', 'danger')
+                 # Ensure it's False if there was an exception
+                stock_added_successfully = False
+
+            # --- Combined Final Flash Message ---
             if stock_added_successfully:
-                # Solo si el stock se añadió con éxito
-                 flash(f'Libro "{title}" (ID: {new_book_id}) añadido, marcado Pendiente y stock inicial ({INITIAL_STOCK_QTY} ud.) registrado.', 'success')
-            # else: Los mensajes de error/warning ya se pusieron antes si el stock falló
+                # Only if stock was successfully added
+                # Flash message translated
+                 flash(f'Book "{title}" (ID: {new_book_id}) added, marked Pending, and initial stock ({int(INITIAL_STOCK_QTY)} unit(s)) registered.', 'success')
+            # else: The error/warning messages were already set earlier if stock_added is False
 
-    # === MANEJO DE ERRORES DEL TRY PRINCIPAL ===
-    # Manejar error si la CREACIÓN del libro falló
+    # === HANDLING ERRORS FROM THE MAIN TRY BLOCK ===
+    # Handle error if book CREATION failed
     except odoorpc.error.RPCError as e_create:
-        logging.error(f"[books_bp] Error RPC al intentar crear libro: {e_create}", exc_info=True)
-        flash(f'Error RPC de Odoo al crear el libro: {e_create}', 'error')
-    # Manejar cualquier otro error inesperado GENERAL (durante creación, tag, o stock si algo raro pasa)
+        # Log message translated
+        logging.error(f"[books_bp] RPC Error attempting to create book: {e_create}", exc_info=True)
+        # Flash message translated
+        flash(f'Odoo RPC Error creating book: {e_create}', 'error')
+    # Handle any other unexpected GENERAL error (during creation, tag, or stock if something weird happens)
     except Exception as e_general:
-        error_context = "creación/tag/stock"
+        # Translated error context logic
+        error_context_en = "creation/tag/stock"
         if not product_creation_successful:
-             error_context = "creación de libro"
+             error_context_en = "book creation"
         elif not tag_added_successfully and not stock_added_successfully:
-            error_context = "añadir tag y stock"
+            error_context_en = "adding tag and stock"
         elif not tag_added_successfully:
-            error_context = "añadir tag"
+            error_context_en = "adding tag"
         elif not stock_added_successfully:
-            error_context = "añadir stock"
+            error_context_en = "adding stock"
             
-        logging.error(f"[books_bp] Error inesperado durante {error_context}: {e_general}", exc_info=True)
-        flash(f'Error inesperado del servidor durante {error_context}: {e_general}', 'error')
+        # Log message translated
+        logging.error(f"[books_bp] Unexpected error during {error_context_en}: {e_general}", exc_info=True)
+        # Flash message translated
+        flash(f'Unexpected server error during {error_context_en}: {e_general}', 'error')
 
-    # Redirigir SIEMPRE al formulario
+    # ALWAYS redirect to the form
     return redirect(url_for('books.add_book_form'))
 
 
-# --- Ruta para listar libros (list_books) ---
-# Dentro de routes_books.py
-
+# --- Route to list books (list_books) ---
 @books_bp.route('/list_books')
 def list_books():
-    books = [] # <---- ¡¡AÑADIR ESTA LÍNEA AQUÍ!!
+    books = []
     error_message = None
     client = get_odoo_client()
     if not client:
-        flash('Error de conexión con Odoo. No se pueden listar los libros.', 'error')
-        error_message = "Error de conexión con Odoo."
-        # Ahora, aunque falle la conexión, books ya existe (como lista vacía)
-        # Así que el return final funcionará.
-    
-    # El resto del try/except puede quedar igual...
-    # PERO también es buena idea mover el return DENTRO del else y except
-    # para ser más explícito. 
-    # Mejor aún, dejemos el return al final, pero asegurándonos que 
-    # books está definida. El `books = []` al inicio es suficiente.
+        # Flash message translated
+        flash('Odoo connection error. Cannot list books.', 'error')
+        # Error message translated
+        error_message = "Odoo connection error."
+        # Now, even if connection fails, books exists (as empty list)
+        # So the final return will work.
 
+    
     try:
-        if client: # Solo intenta si hay cliente
+        if client: # Only try if client exists
             product_ids = client.env['product.product'].search([], limit=80)
             if product_ids:
-                # Aquí books se sobreescribe si se encuentran productos
-                books = client.env['product.product'].read(product_ids, ['name', 'default_code', 'description_sale', 'id']) 
+                # books gets overwritten here if products are found
+                books = client.env['product.product'].read(product_ids, ['name', 'default_code', 'description_sale', 'id'])
             else:
-                # Si no hay productos, books sigue siendo [] (definido al inicio)
-                flash('No se encontraron libros registrados en Odoo.', 'info')
+                # If no products, books remains [] (defined at the start)
+                # Flash message translated
+                flash('No registered books found in Odoo.', 'info')
     except odoorpc.error.RPCError as e:
-        logging.error(f"[books_bp] Error RPC al listar libros: {e}", exc_info=True)
-        error_message = f"Error RPC al comunicar con Odoo: {e}"
+        # Log message translated
+        logging.error(f"[books_bp] RPC Error listing books: {e}", exc_info=True)
+        # Error message translated
+        error_message = f"RPC Error communicating with Odoo: {e}"
         flash(error_message, 'error')
-        # books sigue siendo [] si hay error aquí
+        # books remains [] if error occurs here
     except Exception as e:
-        logging.error(f"[books_bp] Error inesperado al listar libros: {e}", exc_info=True)
-        error_message = f"Error inesperado en el servidor: {e}"
+        # Log message translated
+        logging.error(f"[books_bp] Unexpected error listing books: {e}", exc_info=True)
+        # Error message translated
+        error_message = f"Unexpected server error: {e}"
         flash(error_message, 'error')
-        # books sigue siendo [] si hay error aquí
+        # books remains [] if error occurs here
 
-    # Este return ahora siempre tendrá 'books' definida (como lista vacía o con datos)
+    # This return now always has 'books' defined (as empty list or with data)
     return render_template('list_books.html', books=books, error_message=error_message)
 
-# --- Ruta para VER LIBROS PENDIENTES DE REVISIÓN ---
-# (ACTUALIZADO para buscar por TAG_ID_PENDIENTE = 4)
+# --- Route to VIEW PENDING REVIEW BOOKS ---
+# (UPDATED to search by TAG_ID_PENDIENTE = 4)
 @books_bp.route('/review_books')
 def review_books():
     pending_books = []
     error_message = None
-    
-    # Usa la constante definida arriba (TAG_ID_PENDIENTE = 4)
-    tag_id_a_buscar = TAG_ID_PENDIENTE 
+
+    # Use the constant defined above (TAG_ID_PENDIENTE = 4)
+    # Variable name translated
+    tag_id_to_search = TAG_ID_PENDIENTE 
 
     client = get_odoo_client()
     if not client:
-        flash('Error de conexión con Odoo. No se pueden listar los libros pendientes.', 'error')
-        error_message = "Error de conexión con Odoo."
+        # Flash message translated
+        flash('Odoo connection error. Cannot list pending books.', 'error')
+        # Error message translated
+        error_message = "Odoo connection error."
     else:
         try:
-            logging.info(f"[books_bp GET /review] Buscando libros con etiqueta ID={tag_id_a_buscar}...")
-            
-            # Dominio de búsqueda: busca productos (variants) que TENGAN la etiqueta ID 4
-            # Probamos buscar directamente en product.product usando su campo Many2many 'product_tag_ids'
-            # Este campo SÍ existe en product.product y hereda/refleja las etiquetas del template
-            search_domain = [('product_tag_ids', '=', tag_id_a_buscar)] 
+            # Log message translated
+            logging.info(f"[books_bp GET /review] Searching for books with tag ID={tag_id_to_search}...")
+
+            # Search domain: find products (variants) that HAVE tag ID 4
+            # We try searching directly on product.product using its Many2many field 'product_tag_ids'
+            # This field DOES exist on product.product and inherits/reflects tags from the template
+            search_domain = [('product_tag_ids', '=', tag_id_to_search)]
 
             product_ids = client.env['product.product'].search(search_domain, limit=100)
-            logging.info(f"[books_bp GET /review] IDs de producto (variant) pendientes encontrados: {product_ids}")
+            # Log message translated
+            logging.info(f"[books_bp GET /review] Pending product (variant) IDs found: {product_ids}")
 
             if product_ids:
-                pending_books = client.env['product.product'].read(product_ids, ['id', 'name', 'default_code', 'description']) 
-                logging.info(f"[books_bp GET /review] Datos de libros pendientes leídos: {pending_books}")
+                pending_books = client.env['product.product'].read(product_ids, ['id', 'name', 'default_code', 'description'])
+                # Log message translated
+                logging.info(f"[books_bp GET /review] Pending book data read: {pending_books}")
             else:
-                logging.info(f"[books_bp GET /review] No se encontraron libros pendientes de revisión con ID={tag_id_a_buscar}.")
-                # El flash ahora es más dinámico (si no hay libros y no hay error de conexión)
+                # Log message translated
+                logging.info(f"[books_bp GET /review] No pending review books found with ID={tag_id_to_search}.")
+                # Flash message is now more dynamic (if no books and no connection error)
                 if not error_message:
-                    flash('No hay libros pendientes de revisión actualmente.', 'info')
+                    # Flash message translated
+                    flash('There are currently no books pending review.', 'info')
 
         except odoorpc.error.RPCError as e:
-            logging.error(f"[books_bp GET /review] Error RPC: {e}", exc_info=True)
-            error_message = f"Error RPC Odoo: {e}"
+            # Log message translated
+            logging.error(f"[books_bp GET /review] RPC Error: {e}", exc_info=True)
+            error_message = f"Odoo RPC Error: {e}"
             flash(error_message, 'error')
         except Exception as e:
-            logging.error(f"[books_bp GET /review] Error inesperado: {e}", exc_info=True)
-            error_message = f"Error inesperado: {e}"
+            # Log message translated
+            logging.error(f"[books_bp GET /review] Unexpected error: {e}", exc_info=True)
+            # Error message translated
+            error_message = f"Unexpected error: {e}"
             flash(error_message, 'error')
 
-    # Renderizamos la plantilla
+    # Render the template
     return render_template('review_books.html', books=pending_books, error_message=error_message)
 
-# --- NUEVA RUTA PARA APROBAR UN LIBRO (POST) ---
+# --- NEW ROUTE TO APPROVE A BOOK (POST) ---
 @books_bp.route('/approve_book/<int:book_id>', methods=['POST'])
 def approve_book(book_id):
-    logging.info(f"[books_bp POST /approve] Solicitud para APROBAR product.product ID: {book_id}")
+    # Log message translated
+    logging.info(f"[books_bp POST /approve] Request to APPROVE product.product ID: {book_id}")
 
-    # Validar IDs configurados (ya no necesitamos pendiente aquí si usamos 3 y 4)
-    if TAG_ID_APROBADO <= 0: # Solo revisamos Aprobado
-         flash('Error config: ID etiqueta Aprobado no configurado.', 'error')
-         logging.error("[books_bp approve] Error: ID TAG_ID_APROBADO no configurado.")
+    # Validate configured IDs
+    # Only check Approved
+    if TAG_ID_APROBADO <= 0: 
+         # Flash message translated
+         flash('Config Error: Approved tag ID not configured.', 'error')
+         # Log message translated
+         logging.error("[books_bp approve] Error: TAG_ID_APROBADO ID not configured.")
          return redirect(url_for('books.review_books'))
 
     client = get_odoo_client()
     if not client:
-        flash('Error conexión Odoo.', 'error')
+        # Flash message translated
+        flash('Odoo connection error.', 'error')
         return redirect(url_for('books.review_books'))
 
-    template_id = None # Inicializar para logs
+    # Initialize for logs
+    template_id = None 
     try:
-        # 1. Obtener Template ID y nombre desde el Product ID
+        # 1. Get Template ID and name from Product ID
         product_info = client.env['product.product'].read(book_id, ['product_tmpl_id', 'name'])
         if not product_info or not product_info[0]['product_tmpl_id']:
-            flash(f'Error: No se encontró template para producto ID={book_id}.', 'error')
-            logging.error(f"[books_bp approve] Template no encontrado para product.product ID={book_id}.")
-            return redirect(url_for('books.review_books'))
-        template_id = product_info[0]['product_tmpl_id'][0]
-        book_name = product_info[0].get('name', f'ID {book_id}') 
-        logging.info(f"[books_bp approve] Producto ID={book_id} (Nombre:'{book_name}') tiene Template ID={template_id}.")
-
-        # 2. Preparar datos para ACTUALIZAR etiquetas en el TEMPLATE:
-        #    - Quitar Pendiente (ID 4) -> (3, id)
-        #    - Añadir Aprobado (ID 5)   -> (4, id)
-        update_data = {
-            'product_tag_ids': [
-                (3, TAG_ID_PENDIENTE),  # Desvincular ID 4
-                (4, TAG_ID_APROBADO)   # Vincular ID 5
-            ]
-        }
-        logging.info(f"[books_bp approve] Intentando write en template ID={template_id} con datos: {update_data}")
-
-        # 3. Ejecutar write en product.template
-        write_ok = client.env['product.template'].write([template_id], update_data)
-        
-        # Odoo 16 write devuelve True si tiene éxito
-        if write_ok:
-            logging.info(f"[books_bp approve] ¡Libro '{book_name}' (Template ID: {template_id}) aprobado exitosamente!")
-            flash(f'Libro "{book_name}" aprobado.', 'success')
-        else:
-            # Esto sería raro si no hay excepción, pero por si acaso
-            logging.warning(f"[books_bp approve] Odoo write en template ID={template_id} devolvió False/None.")
-            flash(f'Se intentó aprobar Libro "{book_name}", pero Odoo no confirmó el cambio.', 'warning')
-
-    except odoorpc.error.RPCError as e:
-        logging.error(f"[books_bp approve] Error RPC: {e}", exc_info=True)
-        flash(f'Error RPC al aprobar: {e}', 'error')
-    except Exception as e:
-        logging.error(f"[books_bp approve] Error inesperado: {e}", exc_info=True)
-        flash(f'Error inesperado al aprobar: {e}', 'error')
-
-    return redirect(url_for('books.review_books'))
-
-# --- NUEVA RUTA PARA RECHAZAR UN LIBRO (POST) ---
-@books_bp.route('/reject_book/<int:book_id>', methods=['POST'])
-def reject_book(book_id):
-    logging.info(f"[books_bp POST /reject] Solicitud para RECHAZAR product.product ID: {book_id}")
-
-    if TAG_ID_RECHAZADO <= 0: # Solo revisamos Rechazado
-         flash('Error config: ID etiqueta Rechazado no configurado.', 'error')
-         logging.error("[books_bp reject] Error: ID TAG_ID_RECHAZADO no configurado.")
-         return redirect(url_for('books.review_books'))
-
-    client = get_odoo_client()
-    if not client:
-        flash('Error conexión Odoo.', 'error')
-        return redirect(url_for('books.review_books'))
-
-    template_id = None # Inicializar
-    try:
-        # 1. Obtener Template ID y nombre desde el Product ID
-        product_info = client.env['product.product'].read(book_id, ['product_tmpl_id', 'name'])
-        if not product_info or not product_info[0]['product_tmpl_id']:
-            flash(f'Error: No se encontró template para producto ID={book_id}.', 'error')
-            logging.error(f"[books_bp reject] Template no encontrado para product.product ID={book_id}.")
+            # Flash message translated
+            flash(f'Error: Template not found for product ID={book_id}.', 'error')
+            # Log message translated
+            logging.error(f"[books_bp approve] Template not found for product.product ID={book_id}.")
             return redirect(url_for('books.review_books'))
         template_id = product_info[0]['product_tmpl_id'][0]
         book_name = product_info[0].get('name', f'ID {book_id}')
-        logging.info(f"[books_bp reject] Producto ID={book_id} (Nombre:'{book_name}') tiene Template ID={template_id}.")
+        # Log message translated
+        logging.info(f"[books_bp approve] Product ID={book_id} (Name:'{book_name}') has Template ID={template_id}.")
 
-        # 2. Preparar datos para ACTUALIZAR etiquetas en el TEMPLATE:
-        #    - Quitar Pendiente (ID 4) -> (3, id)
-        #    - Añadir Rechazado (ID 6)  -> (4, id)
+        # 2. Prepare data to UPDATE tags on the TEMPLATE:
+        #    - Remove Pending (ID 4) -> (3, id)
+        #    - Add Approved (ID 5)   -> (4, id)
         update_data = {
             'product_tag_ids': [
-                (3, TAG_ID_PENDIENTE),  # Desvincular ID 4
-                (4, TAG_ID_RECHAZADO)   # Vincular ID 6
+                 # Unlink ID 4
+                (3, TAG_ID_PENDIENTE), 
+                # Link ID 5
+                (4, TAG_ID_APROBADO)    
             ]
         }
-        logging.info(f"[books_bp reject] Intentando write en template ID={template_id} con datos: {update_data}")
+        # Log message translated
+        logging.info(f"[books_bp approve] Attempting write on template ID={template_id} with data: {update_data}")
 
-        # 3. Ejecutar write en product.template
+        # 3. Execute write on product.template
+        write_ok = client.env['product.template'].write([template_id], update_data)
+
+        # Odoo 16 write returns True on success
+        if write_ok:
+            # Log message translated
+            logging.info(f"[books_bp approve] Book '{book_name}' (Template ID: {template_id}) approved successfully!")
+            # Flash message translated
+            flash(f'Book "{book_name}" approved.', 'success')
+        else:
+            # This would be rare without an exception, but just in case
+            # Log message translated
+            logging.warning(f"[books_bp approve] Odoo write on template ID={template_id} returned False/None.")
+            # Flash message translated
+            flash(f'Attempted to approve Book "{book_name}", but Odoo did not confirm the change.', 'warning')
+
+    except odoorpc.error.RPCError as e:
+        # Log message translated
+        logging.error(f"[books_bp approve] RPC Error: {e}", exc_info=True)
+        # Flash message translated
+        flash(f'RPC Error while approving: {e}', 'error')
+    except Exception as e:
+        # Log message translated
+        logging.error(f"[books_bp approve] Unexpected error: {e}", exc_info=True)
+        # Flash message translated
+        flash(f'Unexpected error while approving: {e}', 'error')
+
+    return redirect(url_for('books.review_books'))
+
+# --- NEW ROUTE TO REJECT A BOOK (POST) ---
+@books_bp.route('/reject_book/<int:book_id>', methods=['POST'])
+def reject_book(book_id):
+    # Log message translated
+    logging.info(f"[books_bp POST /reject] Request to REJECT product.product ID: {book_id}")
+
+    # Only check Rejected
+    if TAG_ID_RECHAZADO <= 0: 
+         # Flash message translated
+         flash('Config Error: Rejected tag ID not configured.', 'error')
+         # Log message translated
+         logging.error("[books_bp reject] Error: TAG_ID_RECHAZADO ID not configured.")
+         return redirect(url_for('books.review_books'))
+
+    client = get_odoo_client()
+    if not client:
+        # Flash message translated
+        flash('Odoo connection error.', 'error')
+        return redirect(url_for('books.review_books'))
+
+    # Initialize
+    template_id = None 
+    try:
+        # 1. Get Template ID and name from Product ID
+        product_info = client.env['product.product'].read(book_id, ['product_tmpl_id', 'name'])
+        if not product_info or not product_info[0]['product_tmpl_id']:
+            # Flash message translated
+            flash(f'Error: Template not found for product ID={book_id}.', 'error')
+            # Log message translated
+            logging.error(f"[books_bp reject] Template not found for product.product ID={book_id}.")
+            return redirect(url_for('books.review_books'))
+        template_id = product_info[0]['product_tmpl_id'][0]
+        book_name = product_info[0].get('name', f'ID {book_id}')
+        # Log message translated
+        logging.info(f"[books_bp reject] Product ID={book_id} (Name:'{book_name}') has Template ID={template_id}.")
+
+        # 2. Prepare data to UPDATE tags on the TEMPLATE:
+        #    - Remove Pending (ID 4) -> (3, id)
+        #    - Add Rejected (ID 6)  -> (4, id)
+        update_data = {
+            'product_tag_ids': [
+                # Unlink ID 4
+                (3, TAG_ID_PENDIENTE), 
+                # Link ID 6
+                (4, TAG_ID_RECHAZADO)   
+            ]
+        }
+        # Log message translated
+        logging.info(f"[books_bp reject] Attempting write on template ID={template_id} with data: {update_data}")
+
+        # 3. Execute write on product.template
         write_ok = client.env['product.template'].write([template_id], update_data)
 
         if write_ok:
-            logging.info(f"[books_bp reject] ¡Libro '{book_name}' (Template ID: {template_id}) rechazado exitosamente!")
-            flash(f'Libro "{book_name}" rechazado.', 'success')
+            # Log message translated
+            logging.info(f"[books_bp reject] Book '{book_name}' (Template ID: {template_id}) rejected successfully!")
+            # Flash message translated
+            flash(f'Book "{book_name}" rejected.', 'success')
         else:
-            logging.warning(f"[books_bp reject] Odoo write en template ID={template_id} devolvió False/None.")
-            flash(f'Se intentó rechazar Libro "{book_name}", pero Odoo no confirmó el cambio.', 'warning')
+            # Log message translated
+            logging.warning(f"[books_bp reject] Odoo write on template ID={template_id} returned False/None.")
+            # Flash message translated
+            flash(f'Attempted to reject Book "{book_name}", but Odoo did not confirm the change.', 'warning')
 
     except odoorpc.error.RPCError as e:
-        logging.error(f"[books_bp reject] Error RPC: {e}", exc_info=True)
-        flash(f'Error RPC al rechazar: {e}', 'error')
+        # Log message translated
+        logging.error(f"[books_bp reject] RPC Error: {e}", exc_info=True)
+        # Flash message translated
+        flash(f'RPC Error while rejecting: {e}', 'error')
     except Exception as e:
-        logging.error(f"[books_bp reject] Error inesperado: {e}", exc_info=True)
-        flash(f'Error inesperado al rechazar: {e}', 'error')
+        # Log message translated
+        logging.error(f"[books_bp reject] Unexpected error: {e}", exc_info=True)
+        # Flash message translated
+        flash(f'Unexpected error while rejecting: {e}', 'error')
 
     return redirect(url_for('books.review_books'))
 
 
-# --- NUEVA RUTA PARA VER LIBROS APROBADOS ---
-
+# --- NEW ROUTE TO VIEW APPROVED BOOKS ---
 @books_bp.route('/approved_books')
 def approved_books():
-    # Esta vista ahora mostrará libros que están aprobados PERO AÚN NO en el flujo logístico.
-    
-    eligible_for_shipping_list = [] # Usaremos un nombre de variable más descriptivo
+    # This view will now show books that are approved BUT NOT YET in the logistics flow.
+
+    # Using a more descriptive variable name
+    eligible_for_shipping_list = [] 
     error_message = None
-    
-    # ID de la etiqueta APROBADO (ya definido como constante)
-    tag_id_aprobado = TAG_ID_APROBADO # Es 5
-    # Lista de IDs de logística a excluir (ya definida como constante)
-    tags_logistica_a_excluir = LIST_ALL_LOGISTICS_TAGS 
+
+    # APPROVED tag ID (already defined as constant)
+    # Variable name translated
+    approved_tag_id = TAG_ID_APROBADO # Is 5
+    # List of logistics IDs to exclude (already defined as constant)
+    # Variable name translated
+    logistics_tags_to_exclude = LIST_ALL_LOGISTICS_TAGS
 
     client = get_odoo_client()
     if not client:
-        flash('Error de conexión con Odoo. No se pueden listar los libros aprobados.', 'error')
-        error_message = "Error de conexión con Odoo."
+        # Flash message translated
+        flash('Odoo connection error. Cannot list approved books.', 'error')
+        # Error message translated
+        error_message = "Odoo connection error."
     else:
         try:
-            # Actualizamos el log para reflejar la nueva lógica
-            logging.info(f"[books_bp GET /approved] Buscando libros APROBADOS (ID={tag_id_aprobado}) y que NO TENGAN tags de logística {tags_logistica_a_excluir}...")
+            # Update log to reflect new logic
+            # Log message translated
+            logging.info(f"[books_bp GET /approved] Searching for APPROVED books (ID={approved_tag_id}) that DO NOT HAVE logistics tags {logistics_tags_to_exclude}...")
 
-            # === INICIO DE LA MODIFICACIÓN CLAVE ===
-            # Construir el dominio de búsqueda compuesto:
-            # 1. DEBE tener la etiqueta 'Approved' (ID 5)
-            # 2. NO DEBE tener NINGUNA de las etiquetas de logística (IDs 7, 10, 11, 9, 8)
+            # === START OF KEY MODIFICATION ===
+            # Build the compound search domain:
+            # 1. MUST have the 'Approved' tag (ID 5)
+            # 2. MUST NOT have ANY of the logistics tags (IDs 7, 10, 11, 9, 8)
             search_domain = [
-                ('product_tag_ids', '=', tag_id_aprobado),
-                ('product_tag_ids', 'not in', tags_logistica_a_excluir)
+                ('product_tag_ids', '=', approved_tag_id),
+                ('product_tag_ids', 'not in', logistics_tags_to_exclude)
             ]
-            logging.debug(f"[books_bp GET /approved] Dominio de búsqueda final: {search_domain}")
+            # Log message translated
+            logging.debug(f"[books_bp GET /approved] Final search domain: {search_domain}")
 
-            # Ejecutar la búsqueda con el nuevo dominio
-            product_ids = client.env['product.product'].search(search_domain, limit=100, order="name asc") # Ordenamos por nombre
-            # === FIN DE LA MODIFICACIÓN CLAVE ===
+            # Execute search with the new domain
+             # Sort by name
+            product_ids = client.env['product.product'].search(search_domain, limit=100, order="name asc")
+            # === END OF KEY MODIFICATION ===
 
-            logging.info(f"[books_bp GET /approved] IDs de producto (aprobados, no en logística) encontrados: {product_ids}")
+            # Log message translated
+            logging.info(f"[books_bp GET /approved] Product IDs (approved, not in logistics) found: {product_ids}")
 
             if product_ids:
-                # Leemos los campos necesarios. Puedes añadir 'author', 'isbn' si los quieres mostrar aquí
+                # Read necessary fields. You can add 'author', 'isbn' if you want to show them here
                 eligible_for_shipping_list = client.env['product.product'].read(product_ids, ['id', 'name', 'default_code', 'description'])
-                logging.info(f"[books_bp GET /approved] Datos de libros listos para preparar envío leídos.")
+                # Log message translated
+                logging.info(f"[books_bp GET /approved] Data for books ready for shipment preparation read.")
             else:
-                logging.info(f"[books_bp GET /approved] No se encontraron libros aprobados que no estén ya en logística.")
-                if not error_message: # Solo mostrar si no hay otro error
-                    flash('No hay libros aprobados pendientes de iniciar el proceso de envío.', 'info')
+                # Log message translated
+                logging.info(f"[books_bp GET /approved] No approved books found that are not already in logistics.")
+                 # Only show if there's no other error
+                if not error_message:
+                    # Flash message translated
+                    flash('No approved books are pending to start the shipping process.', 'info')
 
         except odoorpc.error.RPCError as e:
-            logging.error(f"[books_bp GET /approved] Error RPC: {e}", exc_info=True)
-            error_message = f"Error RPC Odoo al buscar aprobados/pendientes de envío: {e}"
+            # Log message translated
+            logging.error(f"[books_bp GET /approved] RPC Error: {e}", exc_info=True)
+            # Error message translated
+            error_message = f"Odoo RPC Error searching approved/pending shipment: {e}"
             flash(error_message, 'error')
         except Exception as e:
-            logging.error(f"[books_bp GET /approved] Error inesperado: {e}", exc_info=True)
-            error_message = f"Error inesperado al buscar aprobados/pendientes de envío: {e}"
+            # Log message translated
+            logging.error(f"[books_bp GET /approved] Unexpected error: {e}", exc_info=True)
+            # Error message translated
+            error_message = f"Unexpected error searching approved/pending shipment: {e}"
             flash(error_message, 'error')
 
-    # Renderizamos la plantilla, pasando la lista con el nombre 'books' como espera la plantilla
+    # Render the template, passing the list named 'books' as expected by the template
+    # (Template expects 'books')
     return render_template('approved_books.html',
-                           books=eligible_for_shipping_list, # La plantilla espera 'books'
+                           books=eligible_for_shipping_list, 
                            error_message=error_message)
 
 
-# --- NUEVA RUTA PARA VER LIBROS RECHAZADOS ---
-
+# --- NEW ROUTE TO VIEW REJECTED BOOKS ---
 @books_bp.route('/rejected_books')
 def rejected_books():
-    rejected_books_list = [] # Nombre de variable diferente
+    # Different variable name
+    rejected_books_list = [] 
     error_message = None
-    
-    # Usaremos el ID de la etiqueta RECHAZADO
-    tag_id_a_buscar = TAG_ID_RECHAZADO 
+
+    # We will use the ID of the REJECTED tag
+    # Variable name translated
+    tag_id_to_search = TAG_ID_RECHAZADO 
 
     client = get_odoo_client()
     if not client:
-        flash('Error de conexión con Odoo. No se pueden listar los libros rechazados.', 'error')
-        error_message = "Error de conexión con Odoo."
+        # Flash message translated
+        flash('Odoo connection error. Cannot list rejected books.', 'error')
+        # Error message translated
+        error_message = "Odoo connection error."
     else:
         try:
-            logging.info(f"[books_bp GET /rejected] Buscando libros con etiqueta Rechazado ID={tag_id_a_buscar}...")
-            
-            # El dominio de búsqueda ahora busca por el TAG_ID_RECHAZADO
-            search_domain = [('product_tag_ids', '=', tag_id_a_buscar)] 
+            # Log message translated
+            logging.info(f"[books_bp GET /rejected] Searching for books with Rejected tag ID={tag_id_to_search}...")
+
+            # Search domain now searches for TAG_ID_RECHAZADO
+            search_domain = [('product_tag_ids', '=', tag_id_to_search)]
 
             product_ids = client.env['product.product'].search(search_domain, limit=100)
-            logging.info(f"[books_bp GET /rejected] IDs de producto rechazados encontrados: {product_ids}")
+            # Log message translated
+            logging.info(f"[books_bp GET /rejected] Rejected product IDs found: {product_ids}")
 
             if product_ids:
-                rejected_books_list = client.env['product.product'].read(product_ids, ['id', 'name', 'default_code', 'description']) 
-                logging.info(f"[books_bp GET /rejected] Datos de libros rechazados leídos.")
+                rejected_books_list = client.env['product.product'].read(product_ids, ['id', 'name', 'default_code', 'description'])
+                # Log message translated
+                logging.info(f"[books_bp GET /rejected] Rejected book data read.")
             else:
-                logging.info(f"[books_bp GET /rejected] No se encontraron libros rechazados con ID={tag_id_a_buscar}.")
+                # Log message translated
+                logging.info(f"[books_bp GET /rejected] No rejected books found with ID={tag_id_to_search}.")
                 if not error_message:
-                    flash('No hay libros marcados como rechazados actualmente.', 'info')
+                    # Flash message translated
+                    flash('There are currently no books marked as rejected.', 'info')
 
         except odoorpc.error.RPCError as e:
-            logging.error(f"[books_bp GET /rejected] Error RPC: {e}", exc_info=True)
-            error_message = f"Error RPC Odoo al buscar rechazados: {e}"
+            # Log message translated
+            logging.error(f"[books_bp GET /rejected] RPC Error: {e}", exc_info=True)
+            # Error message translated
+            error_message = f"Odoo RPC Error searching rejected: {e}"
             flash(error_message, 'error')
         except Exception as e:
-            logging.error(f"[books_bp GET /rejected] Error inesperado: {e}", exc_info=True)
-            error_message = f"Error inesperado al buscar rechazados: {e}"
+            # Log message translated
+            logging.error(f"[books_bp GET /rejected] Unexpected error: {e}", exc_info=True)
+            # Error message translated
+            error_message = f"Unexpected error searching rejected: {e}"
             flash(error_message, 'error')
 
-    # Renderizamos otra NUEVA plantilla
-    return render_template('rejected_books.html', 
-                           books=rejected_books_list, # Pasamos la lista correcta
+    # Render another NEW template
+    # Pass the correct list
+    return render_template('rejected_books.html',
+                           books=rejected_books_list, 
                            error_message=error_message)
-    
 
-# --- NUEVA RUTA LOGÍSTICA: Marcar como Listo para Envío (POST) ---
 
+# --- NEW LOGISTICS ROUTE: Mark as Ready for Shipment (POST) ---
 @books_bp.route('/mark_ready_for_shipment/<int:book_id>', methods=['POST'])
 def mark_ready_for_shipment(book_id):
     """
-    Maneja la acción de marcar un libro aprobado como 'Listo para Envío'.
-    Quita la etiqueta 'Approved' (ID 5) y añade 'Logistics: Ready for Shipment' (ID 7).
+    Handles the action of marking an approved book as 'Ready for Shipment'.
+    Removes the 'Approved' tag (ID 5) and adds 'Logistics: Ready for Shipment' (ID 7).
     """
-    logging.info(f"[books_bp POST /mark_ready] Solicitud para MARCAR LISTO ENVÍO para product.product ID: {book_id}")
+    # Log message translated
+    logging.info(f"[books_bp POST /mark_ready] Request to MARK READY FOR SHIPMENT for product.product ID: {book_id}")
 
-    # Validar IDs de configuración requeridos (Aprobado y Listo para Envío)
+    # Validate required configuration IDs (Approved and Ready for Shipment)
     if TAG_ID_APROBADO <= 0 or TAG_ID_LOGISTICS_READY <= 0:
-         flash('Error de Configuración: IDs de etiquetas Aprobado/ListoEnvío no válidos.', 'error')
-         logging.error(f"[books_bp mark_ready] Error: IDs TAG_ID_APROBADO ({TAG_ID_APROBADO}) o TAG_ID_LOGISTICS_READY ({TAG_ID_LOGISTICS_READY}) no válidos.")
-         # Redirigir a la vista de aprobados donde estaba el botón
+         # Flash message translated
+         flash('Configuration Error: Invalid Approved/ReadyForShipment tag IDs.', 'error')
+         # Log message translated
+         logging.error(f"[books_bp mark_ready] Error: Invalid IDs TAG_ID_APROBADO ({TAG_ID_APROBADO}) or TAG_ID_LOGISTICS_READY ({TAG_ID_LOGISTICS_READY}).")
+         # Redirect to the approved view where the button was
          return redirect(url_for('books.approved_books'))
 
     client = get_odoo_client()
     if not client:
-        flash('Error conexión Odoo. No se pudo actualizar el estado logístico.', 'error')
+        # Flash message translated
+        flash('Odoo connection error. Could not update logistics status.', 'error')
         return redirect(url_for('books.approved_books'))
 
-    template_id = None # Para logging en caso de error
+    # For logging in case of error
+    template_id = None 
     try:
-        # 1. Obtener Template ID y nombre desde el Product ID (como en approve/reject)
+        # 1. Get Template ID and name from Product ID (as in approve/reject)
         product_info = client.env['product.product'].read(book_id, ['product_tmpl_id', 'name'])
         if not product_info or not product_info[0]['product_tmpl_id']:
-            flash(f'Error: No se encontró template para producto ID={book_id}.', 'error')
-            logging.error(f"[books_bp mark_ready] Template no encontrado para product.product ID={book_id}.")
+            # Flash message translated
+            flash(f'Error: Template not found for product ID={book_id}.', 'error')
+            # Log message translated
+            logging.error(f"[books_bp mark_ready] Template not found for product.product ID={book_id}.")
             return redirect(url_for('books.approved_books'))
         template_id = product_info[0]['product_tmpl_id'][0]
         book_name = product_info[0].get('name', f'ID {book_id}')
-        logging.info(f"[books_bp mark_ready] Producto ID={book_id} ('{book_name}') tiene Template ID={template_id}.")
+        # Log message translated
+        logging.info(f"[books_bp mark_ready] Product ID={book_id} ('{book_name}') has Template ID={template_id}.")
 
-        # 2. Preparar datos para ACTUALIZAR etiquetas en el TEMPLATE:
-        #    - Quitar 'Approved' (ID 5)       -> (3, ID_APROBADO)
-        #    - Añadir 'Ready for Shipment' (ID 7) -> (4, ID_LOGISTICS_READY)
+        # 2. Prepare data to UPDATE tags on the TEMPLATE:
+        #    - Remove 'Approved' (ID 5)       -> (3, TAG_ID_APROBADO)
+        #    - Add 'Ready for Shipment' (ID 7) -> (4, TAG_ID_LOGISTICS_READY)
         update_data = {
             'product_tag_ids': [
-                (3, TAG_ID_APROBADO),           # Desvincular ID 5
-                (4, TAG_ID_LOGISTICS_READY)    # Vincular ID 7
+                # Unlink ID 5
+                (3, TAG_ID_APROBADO),
+                # Link ID 7           
+                (4, TAG_ID_LOGISTICS_READY)    
             ]
         }
-        logging.info(f"[books_bp mark_ready] Intentando write en template ID={template_id} con datos: {update_data}")
+        # Log message translated
+        logging.info(f"[books_bp mark_ready] Attempting write on template ID={template_id} with data: {update_data}")
 
-        # 3. Ejecutar write en product.template
+        # 3. Execute write on product.template
         write_ok = client.env['product.template'].write([template_id], update_data)
 
         if write_ok:
-            logging.info(f"[books_bp mark_ready] ¡Libro '{book_name}' (Template ID: {template_id}) marcado como Listo para Envío exitosamente!")
-            flash(f'Libro "{book_name}" marcado como Listo para Envío.', 'success')
+            # Log message translated
+            logging.info(f"[books_bp mark_ready] Book '{book_name}' (Template ID: {template_id}) marked as Ready for Shipment successfully!")
+            # Flash message translated
+            flash(f'Book "{book_name}" marked as Ready for Shipment.', 'success')
         else:
-            logging.warning(f"[books_bp mark_ready] Odoo write en template ID={template_id} devolvió False/None.")
-            flash(f'Se intentó marcar Libro "{book_name}" como Listo, pero Odoo no confirmó.', 'warning')
+            # Log message translated
+            logging.warning(f"[books_bp mark_ready] Odoo write on template ID={template_id} returned False/None.")
+            # Flash message translated
+            flash(f'Attempted to mark Book "{book_name}" as Ready, but Odoo did not confirm.', 'warning')
 
     except odoorpc.error.RPCError as e:
-        logging.error(f"[books_bp mark_ready] Error RPC al marcar listo: (Tmpl ID: {template_id}) {e}", exc_info=True)
-        flash(f'Error RPC al actualizar estado: {e}', 'error')
+        # Log message translated
+        logging.error(f"[books_bp mark_ready] RPC Error marking ready: (Tmpl ID: {template_id}) {e}", exc_info=True)
+        # Flash message translated
+        flash(f'RPC Error updating status: {e}', 'error')
     except Exception as e:
-        logging.error(f"[books_bp mark_ready] Error inesperado al marcar listo: (Tmpl ID: {template_id}) {e}", exc_info=True)
-        flash(f'Error inesperado al actualizar estado: {e}', 'error')
+        # Log message translated
+        logging.error(f"[books_bp mark_ready] Unexpected error marking ready: (Tmpl ID: {template_id}) {e}", exc_info=True)
+        # Flash message translated
+        flash(f'Unexpected error updating status: {e}', 'error')
 
-    # Redirigir siempre de vuelta a la lista de aprobados
-    # El libro ya NO aparecerá ahí si la operación tuvo éxito (por el filtro que añadimos)
+    # Always redirect back to the approved list
+    # The book will NO LONGER appear there if the operation was successful (due to the filter we added)
     return redirect(url_for('books.approved_books'))
 
 
-# --- NUEVA RUTA: Vista del Pipeline Logístico ---
-
-@books_bp.route('/shipping_management') # Mantenemos la ruta
-def shipping_management(): # Mantenemos nombre función
+# --- NEW ROUTE: Logistics Pipeline View ---
+@books_bp.route('/shipping_management') # Keep the route
+def shipping_management(): # Keep the function name
     """
-    Muestra una lista de las Transferencias (stock.picking) creadas
-    para los envíos a sucursales (Tipo de Operación ID 7).
+    Displays a list of Transfers (stock.picking) created
+    for branch shipments (Operation Type ID 7).
     """
-    shipments_list = [] # Lista para guardar las transferencias leídas
+    # List to store the read transfers
+    shipments_list = [] 
     error_message = None
 
-    # ID del Tipo de Operación que queremos listar
-    OPERATION_TYPE_ID_ENVIO = 7 # 'Branch Shipments'
-    logging.info(f"[books_bp GET /shipping_management] Buscando transferencias (stock.picking) de tipo ID={OPERATION_TYPE_ID_ENVIO}")
+    # ID of the Operation Type we want to list
+    # Variable name translated
+    SHIPMENT_OPERATION_TYPE_ID = 7 # 'Branch Shipments'
+    # Log message translated
+    logging.info(f"[books_bp GET /shipping_management] Searching for transfers (stock.picking) of type ID={SHIPMENT_OPERATION_TYPE_ID}")
 
     client = get_odoo_client()
     if not client:
-        flash('Error conexión Odoo. No se puede mostrar la lista de envíos.', 'error')
-        error_message = "Error de conexión con Odoo."
+        # Flash message translated
+        flash('Odoo connection error. Cannot display shipment list.', 'error')
+        # Error message translated
+        error_message = "Odoo connection error."
     else:
         try:
             PickingModel = client.env['stock.picking']
 
-            # Dominio de búsqueda: SOLO las transferencias de nuestro tipo
-            search_domain = [('picking_type_id', '=', OPERATION_TYPE_ID_ENVIO)]
+            # Search domain: ONLY transfers of our type
+            search_domain = [('picking_type_id', '=', SHIPMENT_OPERATION_TYPE_ID)]
 
-            # Campos que queremos leer de cada transferencia
-            # 'name' es la referencia (ej: BS/00001)
-            # 'state' es el estado (draft, waiting, confirmed, assigned, done, cancel)
-            # 'origin' es el texto que pusimos al crearla
-            # 'location_id' y 'location_dest_id' nos darán el origen/destino (vienen como [id, 'Nombre'])
-            # 'scheduled_date' es la fecha prevista (Odoo la pone automáticamente)
+            # Fields we want to read from each transfer
+            # 'name' is the reference (e.g., BS/00001)
+            # 'state' is the status (draft, waiting, confirmed, assigned, done, cancel)
+            # 'origin' is the text we set when creating it
+            # 'location_id' and 'location_dest_id' will give us origin/destination (come as [id, 'Name'])
+            # 'scheduled_date' is the planned date (Odoo sets it automatically)
             fields_to_read = [
                 'id', 'name', 'state', 'origin',
                 'location_id', 'location_dest_id', 'scheduled_date'
             ]
-            # Ordenar por ID descendente para ver las más nuevas primero
+            # Sort by ID descending to see the newest first
             order = 'id desc'
 
-            logging.debug(f"Dominio: {search_domain}, Campos: {fields_to_read}")
+            logging.debug(f"Domain: {search_domain}, Fields: {fields_to_read}")
             shipments_list = PickingModel.search_read(
                 search_domain,
                 fields=fields_to_read,
                 order=order,
-                limit=50 # Limitar por si hay muchas
+                # Limit in case there are many
+                limit=50 
             )
-            logging.info(f"Se encontraron {len(shipments_list)} transferencias de envío.")
+            # Log message translated
+            logging.info(f"{len(shipments_list)} shipment transfers found.")
 
             if not shipments_list and not error_message:
-                flash('No hay envíos de lote registrados todavía.', 'info')
+                # Flash message translated
+                flash('No batch shipments registered yet.', 'info')
 
         except odoorpc.error.RPCError as e:
-            logging.error(f"[books_bp GET /shipping_management] Error RPC: {e}", exc_info=True)
-            error_message = f"Error RPC Odoo al buscar envíos: {e}"
+            # Log message translated
+            logging.error(f"[books_bp GET /shipping_management] RPC Error: {e}", exc_info=True)
+            # Error message translated
+            error_message = f"Odoo RPC Error searching shipments: {e}"
             flash(error_message, 'error')
         except Exception as e:
-            logging.error(f"[books_bp GET /shipping_management] Error inesperado: {e}", exc_info=True)
-            error_message = f"Error inesperado al buscar envíos: {e}"
+            # Log message translated
+            logging.error(f"[books_bp GET /shipping_management] Unexpected error: {e}", exc_info=True)
+            # Error message translated
+            error_message = f"Unexpected error searching shipments: {e}"
             flash(error_message, 'error')
 
-    # Renderizar la misma plantilla, pero ahora le pasamos la lista de *transferencias*
-    # La plantilla tendrá que ser adaptada para mostrar esta nueva información.
-    # ¡¡OJO!! El nombre de la variable que pasamos A LA PLANTILLA sigue siendo 'books'
-    # por compatibilidad temporal con la plantilla existente. LO CAMBIAREMOS EN EL SIGUIENTE PASO.
-    # Es mejor renombrar ahora para claridad:
+    # Render the template, now passing the list of *transfers*
+    # Renamed variable passed to template for clarity
     return render_template('shipping_management.html',
-                           shipments=shipments_list, # <--- CAMBIO: Nombre de variable pasado a la plantilla
-                           # Ya no pasamos los TAG_IDs porque la lógica se basará en el 'state'
+                           shipments=shipments_list, 
+                           # We no longer pass TAG_IDs because logic will be based on 'state'
                            error_message=error_message)
 
 
-
-# --- NUEVA RUTA LOGÍSTICA: Marcar como En Tránsito (POST) ---
-
+# --- NEW LOGISTICS ROUTE: Mark as In Transit (POST) ---
+# NOTE: This route currently only changes product tags, it doesn't interact with stock.picking state.
+# You might want to update this later to ALSO update the stock.picking if applicable.
 @books_bp.route('/mark_in_transit/<int:destination_tag_id>/<int:book_id>', methods=['POST'])
 def mark_in_transit(destination_tag_id, book_id):
     """
-    Maneja la acción de marcar un libro como 'En Tránsito' hacia un destino específico.
-    Quita la etiqueta 'Ready for Shipment' (ID 7) y añade la etiqueta de destino (ID 10 o 11).
+    Handles the action of marking a book as 'In Transit' to a specific destination.
+    Removes the 'Ready for Shipment' tag (ID 7) and adds the destination tag (ID 10 or 11).
     """
-    logging.info(f"[books_bp POST /mark_in_transit] Solicitud para MARCAR EN TRÁNSITO (Dest ID: {destination_tag_id}) para product.product ID: {book_id}")
+    # Log message translated
+    logging.info(f"[books_bp POST /mark_in_transit] Request to MARK IN TRANSIT (Dest ID: {destination_tag_id}) for product.product ID: {book_id}")
 
-    # Validar IDs necesarios: Ready (que quitamos) y el Destino (que añadimos)
-    tags_validas_destino = [TAG_ID_LOGISTICS_TRANSIT_EC, TAG_ID_LOGISTICS_TRANSIT_VE, 8] # Incluir el ID 8 general por si lo usamos después
-    if TAG_ID_LOGISTICS_READY <= 0 or destination_tag_id not in tags_validas_destino:
-         flash(f'Error Config: ID Etiqueta Ready ({TAG_ID_LOGISTICS_READY}) o Destino ({destination_tag_id}) inválido.', 'error')
-         logging.error(f"[books_bp mark_in_transit] IDs inválidos: READY={TAG_ID_LOGISTICS_READY}, DESTINATION={destination_tag_id}")
-         # Redirigir a la gestión de envíos
+    # Validate necessary IDs: Ready (which we remove) and Destination (which we add)
+    # Variable name translated
+    valid_destination_tags = [TAG_ID_LOGISTICS_TRANSIT_EC, TAG_ID_LOGISTICS_TRANSIT_VE, 8] # Include general ID 8 in case we use it later
+    if TAG_ID_LOGISTICS_READY <= 0 or destination_tag_id not in valid_destination_tags:
+         # Flash message translated
+         flash(f'Config Error: Invalid Ready ({TAG_ID_LOGISTICS_READY}) or Destination ({destination_tag_id}) tag ID.', 'error')
+         # Log message translated
+         logging.error(f"[books_bp mark_in_transit] Invalid IDs: READY={TAG_ID_LOGISTICS_READY}, DESTINATION={destination_tag_id}")
+         # Redirect to shipping management
          return redirect(url_for('books.shipping_management'))
 
     client = get_odoo_client()
     if not client:
-        flash('Error conexión Odoo.', 'error')
+        # Flash message translated
+        flash('Odoo connection error.', 'error')
         return redirect(url_for('books.shipping_management'))
 
     template_id = None
     try:
-        # 1. Obtener Template ID y nombre (igual que antes)
+        # 1. Get Template ID and name (same as before)
         product_info = client.env['product.product'].read(book_id, ['product_tmpl_id', 'name'])
         if not product_info or not product_info[0]['product_tmpl_id']:
-            flash(f'Error: Template no encontrado para producto ID={book_id}.', 'error')
-            logging.error(f"[books_bp mark_in_transit] Template no encontrado para Prod ID={book_id}.")
+             # Flash message translated
+            flash(f'Error: Template not found for product ID={book_id}.', 'error')
+             # Log message translated
+            logging.error(f"[books_bp mark_in_transit] Template not found for Prod ID={book_id}.")
             return redirect(url_for('books.shipping_management'))
         template_id = product_info[0]['product_tmpl_id'][0]
         book_name = product_info[0].get('name', f'ID {book_id}')
+        # Log message translated
         logging.info(f"[books_bp mark_in_transit] Prod ID={book_id} ('{book_name}'), Tmpl ID={template_id}")
 
-        # 2. Preparar datos ACTUALIZACIÓN:
-        #    - Quitar 'Ready for Shipment' (ID 7)  -> (3, TAG_ID_LOGISTICS_READY)
-        #    - Añadir Etiqueta Destino (ID 10 o 11) -> (4, destination_tag_id)
+        # 2. Prepare UPDATE data:
+        #    - Remove 'Ready for Shipment' (ID 7)  -> (3, TAG_ID_LOGISTICS_READY)
+        #    - Add Destination Tag (ID 10 or 11) -> (4, destination_tag_id)
         update_data = {
             'product_tag_ids': [
                 (3, TAG_ID_LOGISTICS_READY),
                 (4, destination_tag_id)
             ]
         }
-        logging.info(f"[books_bp mark_in_transit] Intentando write Tmpl ID={template_id} con datos: {update_data}")
+        # Log message translated
+        logging.info(f"[books_bp mark_in_transit] Attempting write Tmpl ID={template_id} with data: {update_data}")
 
-        # 3. Ejecutar write
+        # 3. Execute write
         write_ok = client.env['product.template'].write([template_id], update_data)
 
         if write_ok:
-            logging.info(f"[books_bp mark_in_transit] ¡Libro '{book_name}' (Tmpl ID:{template_id}) marcado EN TRÁNSITO (Dest ID:{destination_tag_id})!")
-            flash(f'Libro "{book_name}" marcado como En Tránsito.', 'success')
+             # Log message translated
+            logging.info(f"[books_bp mark_in_transit] Book '{book_name}' (Tmpl ID:{template_id}) marked IN TRANSIT (Dest ID:{destination_tag_id})!")
+             # Flash message translated
+            flash(f'Book "{book_name}" marked as In Transit.', 'success')
         else:
-            logging.warning(f"[books_bp mark_in_transit] Write devolvió False/None para Tmpl ID:{template_id}.")
-            flash(f'Se intentó marcar Libro "{book_name}" como En Tránsito, pero Odoo no confirmó.', 'warning')
+            # Log message translated
+            logging.warning(f"[books_bp mark_in_transit] Write returned False/None for Tmpl ID:{template_id}.")
+             # Flash message translated
+            flash(f'Attempted to mark Book "{book_name}" as In Transit, but Odoo did not confirm.', 'warning')
 
     except odoorpc.error.RPCError as e:
-        logging.error(f"[books_bp mark_in_transit] Error RPC: (Tmpl ID:{template_id}) {e}", exc_info=True)
-        flash(f'Error RPC al marcar En Tránsito: {e}', 'error')
+        # Log message translated
+        logging.error(f"[books_bp mark_in_transit] RPC Error: (Tmpl ID:{template_id}) {e}", exc_info=True)
+        # Flash message translated
+        flash(f'RPC Error marking In Transit: {e}', 'error')
     except Exception as e:
-        logging.error(f"[books_bp mark_in_transit] Error Inesperado: (Tmpl ID:{template_id}) {e}", exc_info=True)
-        flash(f'Error inesperado al marcar En Tránsito: {e}', 'error')
+        # Log message translated
+        logging.error(f"[books_bp mark_in_transit] Unexpected Error: (Tmpl ID:{template_id}) {e}", exc_info=True)
+        # Flash message translated
+        flash(f'Unexpected error marking In Transit: {e}', 'error')
 
-    # Redirigir siempre de vuelta a la GESTIÓN DE ENVÍOS
-    # El libro seguirá apareciendo, pero con el estado actualizado y diferentes botones
+    # Always redirect back to SHIPPING MANAGEMENT
+    # The book will still appear, but with updated status and different buttons (depending on template logic)
     return redirect(url_for('books.shipping_management'))
 
 
-# --- NUEVA RUTA LOGÍSTICA: Marcar como Entregado (POST) ---
-
+# --- NEW LOGISTICS ROUTE: Mark as Delivered (POST) ---
+# NOTE: Similar to mark_in_transit, this primarily manages tags.
 @books_bp.route('/mark_delivered/<int:book_id>', methods=['POST'])
 def mark_delivered(book_id):
     """
-    Maneja la acción de marcar un libro como 'Entregado'.
-    Quita CUALQUIER etiqueta 'In Transit' y añade 'Logistics: Delivered' (ID 9).
+    Handles the action of marking a book as 'Delivered'.
+    Removes ANY 'In Transit' tag and adds 'Logistics: Delivered' (ID 9).
     """
-    logging.info(f"[books_bp POST /mark_delivered] Solicitud para MARCAR ENTREGADO para product.product ID: {book_id}")
+    # Log message translated
+    logging.info(f"[books_bp POST /mark_delivered] Request to MARK DELIVERED for product.product ID: {book_id}")
 
-    # IDs a validar: El ID de Delivered (que añadimos) y la lista de los de tránsito (que quitamos)
+    # IDs to validate: Delivered ID (which we add) and list of transit IDs (which we remove)
+    # Variable name fine
     transit_tags_to_remove = [TAG_ID_LOGISTICS_TRANSIT_EC, TAG_ID_LOGISTICS_TRANSIT_VE, 8] # IDs 10, 11, 8
     if TAG_ID_LOGISTICS_DELIVERED <= 0:
-         flash(f'Error Config: ID Etiqueta Delivered ({TAG_ID_LOGISTICS_DELIVERED}) inválido.', 'error')
-         logging.error(f"[books_bp mark_delivered] ID inválido: DELIVERED={TAG_ID_LOGISTICS_DELIVERED}")
+        # Flash message translated
+         flash(f'Config Error: Invalid Delivered Tag ID ({TAG_ID_LOGISTICS_DELIVERED}).', 'error')
+         # Log message translated
+         logging.error(f"[books_bp mark_delivered] Invalid ID: DELIVERED={TAG_ID_LOGISTICS_DELIVERED}")
          return redirect(url_for('books.shipping_management'))
 
     client = get_odoo_client()
     if not client:
-        flash('Error conexión Odoo.', 'error')
+        # Flash message translated
+        flash('Odoo connection error.', 'error')
         return redirect(url_for('books.shipping_management'))
 
     template_id = None
     try:
-        # 1. Obtener Template ID y nombre (igual que antes)
+        # 1. Get Template ID and name (same as before)
         product_info = client.env['product.product'].read(book_id, ['product_tmpl_id', 'name'])
         if not product_info or not product_info[0]['product_tmpl_id']:
-            flash(f'Error: Template no encontrado para producto ID={book_id}.', 'error')
-            logging.error(f"[books_bp mark_delivered] Template no encontrado para Prod ID={book_id}.")
+             # Flash message translated
+            flash(f'Error: Template not found for product ID={book_id}.', 'error')
+             # Log message translated
+            logging.error(f"[books_bp mark_delivered] Template not found for Prod ID={book_id}.")
             return redirect(url_for('books.shipping_management'))
         template_id = product_info[0]['product_tmpl_id'][0]
         book_name = product_info[0].get('name', f'ID {book_id}')
+        # Log message translated
         logging.info(f"[books_bp mark_delivered] Prod ID={book_id} ('{book_name}'), Tmpl ID={template_id}")
 
-        # 2. Preparar datos ACTUALIZACIÓN:
-        #    - Quitar TODAS las etiquetas 'In Transit' (IDs 8, 10, 11) -> (3, id) para cada una
-        #    - Añadir 'Delivered' (ID 9)             -> (4, TAG_ID_LOGISTICS_DELIVERED)
-        # Construimos la lista de operaciones de desvinculación dinámicamente
+        # 2. Prepare UPDATE data:
+        #    - Remove ALL 'In Transit' tags (IDs 8, 10, 11) -> (3, id) for each one
+        #    - Add 'Delivered' (ID 9)             -> (4, TAG_ID_LOGISTICS_DELIVERED)
+        # Dynamically build the list of unlink operations
         tags_operations = []
         for tag_id_to_remove in transit_tags_to_remove:
-             tags_operations.append((3, tag_id_to_remove)) # Comando para desvincular
+            # Command to unlink
+             tags_operations.append((3, tag_id_to_remove)) 
 
-        # Añadimos la operación para vincular 'Delivered'
+        # Add the operation to link 'Delivered'
         tags_operations.append((4, TAG_ID_LOGISTICS_DELIVERED))
 
         update_data = {'product_tag_ids': tags_operations}
-        logging.info(f"[books_bp mark_delivered] Intentando write Tmpl ID={template_id} con datos: {update_data}")
+        # Log message translated
+        logging.info(f"[books_bp mark_delivered] Attempting write Tmpl ID={template_id} with data: {update_data}")
 
-        # 3. Ejecutar write
+        # 3. Execute write
         write_ok = client.env['product.template'].write([template_id], update_data)
 
         if write_ok:
-            logging.info(f"[books_bp mark_delivered] ¡Libro '{book_name}' (Tmpl ID:{template_id}) marcado ENTREGADO!")
-            flash(f'Libro "{book_name}" marcado como Entregado.', 'success')
+            # Log message translated
+            logging.info(f"[books_bp mark_delivered] Book '{book_name}' (Tmpl ID:{template_id}) marked DELIVERED!")
+            # Flash message translated
+            flash(f'Book "{book_name}" marked as Delivered.', 'success')
         else:
-            logging.warning(f"[books_bp mark_delivered] Write devolvió False/None para Tmpl ID:{template_id}.")
-            flash(f'Se intentó marcar Libro "{book_name}" como Entregado, pero Odoo no confirmó.', 'warning')
+            # Log message translated
+            logging.warning(f"[books_bp mark_delivered] Write returned False/None for Tmpl ID:{template_id}.")
+            # Flash message translated
+            flash(f'Attempted to mark Book "{book_name}" as Delivered, but Odoo did not confirm.', 'warning')
 
     except odoorpc.error.RPCError as e:
-        logging.error(f"[books_bp mark_delivered] Error RPC: (Tmpl ID:{template_id}) {e}", exc_info=True)
-        flash(f'Error RPC al marcar Entregado: {e}', 'error')
+         # Log message translated
+        logging.error(f"[books_bp mark_delivered] RPC Error: (Tmpl ID:{template_id}) {e}", exc_info=True)
+         # Flash message translated
+        flash(f'RPC Error marking Delivered: {e}', 'error')
     except Exception as e:
-        logging.error(f"[books_bp mark_delivered] Error Inesperado: (Tmpl ID:{template_id}) {e}", exc_info=True)
-        flash(f'Error inesperado al marcar Entregado: {e}', 'error')
+         # Log message translated
+        logging.error(f"[books_bp mark_delivered] Unexpected Error: (Tmpl ID:{template_id}) {e}", exc_info=True)
+         # Flash message translated
+        flash(f'Unexpected error marking Delivered: {e}', 'error')
 
-    # Redirigir siempre de vuelta a la GESTIÓN DE ENVÍOS
-    # El libro YA NO aparecerá aquí si tuvo éxito, porque la vista filtra por tags EN pipeline
+    # Always redirect back to SHIPPING MANAGEMENT
+    # The book will NO LONGER appear here if successful, because the view filters by tags IN the pipeline (assumption)
     return redirect(url_for('books.shipping_management'))
 
 
-# --- NUEVA RUTA: Crear Envío de Lote (stock.picking) ---
-
+# --- NEW ROUTE: Create Batch Shipment (stock.picking) ---
 @books_bp.route('/create_batch_shipment', methods=['POST'])
 def create_batch_shipment():
     """
-    Procesa la creación de una transferencia de lote (stock.picking) en Odoo.
-    Recibe los IDs de los libros seleccionados y el ID de la ubicación destino.
+    Processes the creation of a batch transfer (stock.picking) in Odoo.
+    Receives the IDs of selected books and the destination location ID.
     """
-    logging.info("[books_bp POST /create_batch_shipment] Solicitud recibida para crear envío de lote.")
+    # Log message translated
+    logging.info("[books_bp POST /create_batch_shipment] Received request to create batch shipment.")
 
-    # 1. Obtener datos del formulario
-    # getlist obtiene todos los valores de checkboxes con el mismo 'name'
+    # 1. Get form data
+    # getlist gets all values from checkboxes with the same 'name'
     selected_book_ids_str = request.form.getlist('selected_book_ids')
     destination_location_id_str = request.form.get('destination_location_id')
 
-    logging.debug(f"IDs de libros seleccionados (str): {selected_book_ids_str}")
-    logging.debug(f"ID de ubicación destino (str): {destination_location_id_str}")
+    # Log messages translated
+    logging.debug(f"Selected book IDs (str): {selected_book_ids_str}")
+    logging.debug(f"Destination location ID (str): {destination_location_id_str}")
 
-    # 2. Validaciones básicas
+    # 2. Basic validations
     if not selected_book_ids_str:
-        flash('Error: No se seleccionó ningún libro para el envío.', 'error')
-        return redirect(url_for('books.approved_books')) # Volver a la página de selección
+         # Flash message translated
+        flash('Error: No books selected for shipment.', 'error')
+         # Go back to the selection page
+        return redirect(url_for('books.approved_books')) 
 
     if not destination_location_id_str:
-        flash('Error: No se seleccionó ninguna ubicación de destino.', 'error')
+         # Flash message translated
+        flash('Error: No destination location selected.', 'error')
         return redirect(url_for('books.approved_books'))
 
-    # Convertir IDs a enteros
+    # Convert IDs to integers
     try:
-        # Convertimos la lista de strings a lista de integers
+        # Convert list of strings to list of integers
         selected_book_ids = [int(id_str) for id_str in selected_book_ids_str]
         destination_location_id = int(destination_location_id_str)
-        logging.info(f"Libros a enviar (IDs): {selected_book_ids}")
-        logging.info(f"Ubicación destino ID: {destination_location_id}")
+        # Log messages translated
+        logging.info(f"Books to ship (IDs): {selected_book_ids}")
+        logging.info(f"Destination location ID: {destination_location_id}")
     except ValueError:
-        flash('Error: IDs de libro o destino inválidos.', 'error')
-        logging.error(f"Error al convertir IDs: books={selected_book_ids_str}, dest={destination_location_id_str}")
+        # Flash message translated
+        flash('Error: Invalid book or destination IDs.', 'error')
+        # Log message translated
+        logging.error(f"Error converting IDs: books={selected_book_ids_str}, dest={destination_location_id_str}")
         return redirect(url_for('books.approved_books'))
 
-    # --- IDs de Configuración Odoo (necesitamos definirlos como constantes arriba o pasarlos) ---
-    # ¡¡¡ASEGÚRATE DE TENER ESTOS IDS CORRECTOS!!!
-    SOURCE_LOCATION_ID = 30          # ID de 'Stock Libros Aprobados ONG'
-    OPERATION_TYPE_ID_ENVIO = 7    # ID de 'Envíos a Sucursales' / 'Branch Shipments'
-    # ---------------------------------------------------------------------------------------
+    # --- Odoo Configuration IDs (need to be defined as constants above or passed) ---
+   
+    SOURCE_LOCATION_ID = 30          # ID of 'Stock Books Approved ONG'
+    # Variable name translated
+    SHIPMENT_OPERATION_TYPE_ID = 7    # ID of 'Branch Shipments' 
+   
 
     client = get_odoo_client()
     if not client:
-        flash('Error conexión Odoo. No se pudo crear el envío.', 'error')
+        # Flash message translated
+        flash('Odoo connection error. Could not create shipment.', 'error')
         return redirect(url_for('books.approved_books'))
 
-    new_picking_id = None # Para guardar el ID de la transferencia creada
+    # To store the ID of the created transfer
+    new_picking_id = None 
     try:
-        # 3. Preparar datos para crear el stock.picking
-        logging.info("Preparando datos para crear 'stock.picking'...")
+        # 3. Prepare data to create the stock.picking
+        # Log message translated
+        logging.info("Preparing data to create 'stock.picking'...")
 
-        # Modelo de Odoo para transferencias
+        # Odoo model for transfers
         PickingModel = client.env['stock.picking']
 
-        # === Construcción de las líneas de movimiento (move_ids_without_package) ===
-        # Odoo espera una lista de operaciones, (0, 0, {valores}) para crear nuevas líneas
+        # === Building move lines (move_ids_without_package) ===
+        # Odoo expects a list of operations, (0, 0, {values}) to create new lines
         move_lines_data = []
-        logging.info(f"Creando líneas de movimiento para {len(selected_book_ids)} libros...")
-        # Necesitamos obtener el nombre de cada libro para la descripción del movimiento (opcional pero útil)
+        # Log message translated
+        logging.info(f"Creating move lines for {len(selected_book_ids)} books...")
+        # Get book names for move description (optional but useful)
         try:
              books_data = client.env['product.product'].read(selected_book_ids, ['name'])
-             # Crear un diccionario id -> nombre para buscar fácil
+             # Create a dictionary id -> name for easy lookup
              book_names = {book['id']: book['name'] for book in books_data}
         except Exception as read_err:
-             logging.warning(f"No se pudieron leer los nombres de los libros: {read_err}. Se usará nombre genérico.", exc_info=True)
-             book_names = {} # Diccionario vacío
+             # Log message translated
+             logging.warning(f"Could not read book names: {read_err}. Generic name will be used.", exc_info=True)
+             # Empty dictionary
+             book_names = {} 
 
         for book_id in selected_book_ids:
-            book_name_for_move = book_names.get(book_id, f"Libro ID {book_id}") # Usa el nombre si lo encontró
+             # Use name if found
+            book_name_for_move = book_names.get(book_id, f"Book ID {book_id}") 
             line = (0, 0, {
-                'name': book_name_for_move, # Descripción de la línea
-                'product_id': book_id,       # El ID del libro a mover
-                'product_uom_qty': 1,        # Cantidad: 1 por ahora (asumimos 1 copia por libro)
-                'product_uom': 1,            # ID de Unidad de Medida (normalmente 1 para Unidades)
-                'location_id': SOURCE_LOCATION_ID,       # Ubicación Origen FIJA
-                'location_dest_id': destination_location_id, # Ubicación Destino del formulario
+                # Line description
+                'name': book_name_for_move, 
+                # Book ID to move
+                'product_id': book_id,       
+                # Quantity: 1 for now (assume 1 copy per book)
+                'product_uom_qty': 1.0, # Use float        
+                # Unit of Measure ID (usually 1 for Units)
+                'product_uom': 1,            
+                 # FIXED Source Location
+                'location_id': SOURCE_LOCATION_ID,       
+                # Destination Location from form
+                'location_dest_id': destination_location_id, 
             })
             move_lines_data.append(line)
-            logging.debug(f"  Añadida línea para book_id {book_id}: {line}")
+            # Log message translated
+            logging.debug(f"  Added line for book_id {book_id}: {line}")
         # =============================================================================
 
-        # Datos principales (cabecera) de la transferencia (stock.picking)
+        # Main transfer header data (stock.picking)
         picking_data = {
-            'picking_type_id': OPERATION_TYPE_ID_ENVIO,   # ID del Tipo de Operación "Envíos a Sucursales"
-            'location_id': SOURCE_LOCATION_ID,            # ID Ubicación Origen
-            'location_dest_id': destination_location_id, # ID Ubicación Destino
-            'origin': 'Envío Lote desde App Flask ONG',   # Un texto para saber de dónde vino
-            'move_ids_without_package': move_lines_data,  # Las líneas de los productos a mover
-            # 'state': 'draft', # Odoo lo pone en draft por defecto al crear así
-            # Podrían necesitarse otros campos según configuración estricta de Odoo
+             # Operation Type ID "Branch Shipments"
+            'picking_type_id': SHIPMENT_OPERATION_TYPE_ID,   
+             # Source Location ID
+            'location_id': SOURCE_LOCATION_ID,            
+             # Destination Location ID
+            'location_dest_id': destination_location_id, 
+             # Text to know where it came from translated
+            'origin': 'Batch Shipment from ONG Flask App',   
+             # Lines of products to move
+            'move_ids_without_package': move_lines_data,  
+            # Odoo sets to draft by default when created this way
+            # 'state': 'draft', 
+            # Other fields might be needed depending on strict Odoo configuration
         }
-        logging.info("Datos para crear 'stock.picking' preparados.")
+        # Log message translated
+        logging.info("Data prepared for creating 'stock.picking'.")
         logging.debug(f"Picking Data: {picking_data}")
 
-        # 4. Ejecutar la creación en Odoo
-        logging.info("Intentando crear 'stock.picking' en Odoo...")
-        new_picking_id_list = PickingModel.create([picking_data]) # Create espera una lista
+        # 4. Execute creation in Odoo
+        # Log message translated
+        logging.info("Attempting to create 'stock.picking' in Odoo...")
+        # Create expects a list
+        new_picking_id_list = PickingModel.create([picking_data]) 
 
         if new_picking_id_list:
-             new_picking_id = new_picking_id_list[0] # Obtenemos el ID de la lista
-             logging.info(f"¡Éxito! Transferencia (stock.picking) creada con ID: {new_picking_id} !")
+             # Get ID from the list
+             new_picking_id = new_picking_id_list[0] 
+             # Log message translated
+             logging.info(f"Success! Transfer (stock.picking) created with ID: {new_picking_id} !")
              
-             # LEER el nombre/referencia de la transferencia creada (ej: WH/OUT/00005)
+             # READ the name/reference of the created transfer (e.g., BS/00001)
              picking_ref = ""
              try:
                 picking_info = PickingModel.read(new_picking_id, ['name'])
                 if picking_info: picking_ref = picking_info[0].get('name', '')
-             except Exception: pass # No crítico si no podemos leer el nombre
+             # Not critical if we can't read the name
+             except Exception: pass 
              
-             flash(f'Envío de lote creado con éxito en Odoo (Referencia: {picking_ref or new_picking_id}).', 'success')
+             # Flash message translated
+             flash(f'Batch shipment created successfully in Odoo (Reference: {picking_ref or new_picking_id}).', 'success')
 
-             # ----- IMPORTANTE: QUITAR TAG 'Approved' de los libros enviados -----
-             # Ahora que se creó el envío, debemos quitar la etiqueta 'Approved' (ID 5)
-             # de los libros incluidos para que no aparezcan más en la lista de preparación.
+             # ----- IMPORTANT: REMOVE 'Approved' TAG from shipped books -----
+             # Now that the shipment is created, remove 'Approved' tag (ID 5)
+             # from the included books so they no longer appear in the preparation list.
              try:
-                  logging.info(f"Quitando tag 'Approved' (ID {TAG_ID_APROBADO}) de los libros enviados: {selected_book_ids}")
+                  # Log message translated
+                  logging.info(f"Removing 'Approved' tag (ID {TAG_ID_APROBADO}) from shipped books: {selected_book_ids}")
                   templates_to_update = []
-                  # Necesitamos los IDs de los templates asociados a los products
+                  # Need template IDs associated with the products
                   product_infos = client.env['product.product'].read(selected_book_ids, ['product_tmpl_id'])
                   if product_infos:
                       templates_to_update = [p['product_tmpl_id'][0] for p in product_infos if p.get('product_tmpl_id')]
-                      # Quitar duplicados si varios libros eran del mismo template (poco probable aquí)
+                       # Remove duplicates if multiple books were from the same template (unlikely here)
                       templates_to_update = list(set(templates_to_update)) 
                       
                       if templates_to_update:
-                          update_data = {'product_tag_ids': [(3, TAG_ID_APROBADO)]} # Desvincular Aprobado
+                           # Unlink Approved
+                          update_data = {'product_tag_ids': [(3, TAG_ID_APROBADO)]} 
                           write_ok = client.env['product.template'].write(templates_to_update, update_data)
                           if write_ok:
-                              logging.info(f"Tag 'Approved' quitado de los templates: {templates_to_update}")
+                              # Log message translated
+                              logging.info(f"'Approved' tag removed from templates: {templates_to_update}")
                           else:
-                              logging.warning(f"Odoo no confirmó el quitado del tag Approved para templates {templates_to_update}")
-                              flash('Advertencia: No se pudo quitar la etiqueta "Aprobado" de los libros enviados. Podrían reaparecer.', 'warning')
+                              # Log message translated
+                              logging.warning(f"Odoo did not confirm removal of Approved tag for templates {templates_to_update}")
+                              # Flash message translated
+                              flash('Warning: Could not remove the "Approved" tag from shipped books. They might reappear.', 'warning')
                       else:
-                           logging.warning("No se encontraron IDs de template válidos para quitar etiqueta.")
+                           # Log message translated
+                           logging.warning("No valid template IDs found to remove tag.")
              except Exception as tag_err:
-                  logging.error(f"Error al intentar quitar tag 'Approved' de libros enviados: {tag_err}", exc_info=True)
-                  flash('Advertencia: Hubo un error al actualizar el estado de los libros enviados en la lista de preparación.', 'warning')
-             # ---------------------------------------------------------------------
+                   # Log message translated
+                  logging.error(f"Error attempting to remove 'Approved' tag from shipped books: {tag_err}", exc_info=True)
+                   # Flash message translated
+                  flash('Warning: An error occurred while updating the status of shipped books in the preparation list.', 'warning')
+             
 
         else:
-             # Raro si no hay error RPC
-             logging.error("Odoo 'stock.picking.create' no devolvió ID pero no hubo excepción.")
-             flash('Se intentó crear el envío, pero Odoo no devolvió confirmación.', 'error')
+             # Rare if no RPC error
+             # Log message translated
+             logging.error("Odoo 'stock.picking.create' returned no ID but there was no exception.")
+             # Flash message translated
+             flash('Attempted to create shipment, but Odoo did not return confirmation.', 'error')
              return redirect(url_for('books.approved_books'))
 
 
     except odoorpc.error.RPCError as e:
-        logging.error(f"[books_bp POST /create_batch_shipment] Error RPC Odoo: {e}", exc_info=True)
+        # Log message translated
+        logging.error(f"[books_bp POST /create_batch_shipment] Odoo RPC Error: {e}", exc_info=True)
         error_details = str(getattr(e, 'fault', e))
-        flash(f'Error de Odoo al crear envío ({type(e).__name__}): {error_details}', 'error')
-        return redirect(url_for('books.approved_books')) # Volver para corregir
+        # Flash message translated
+        flash(f'Odoo error creating shipment ({type(e).__name__}): {error_details}', 'error')
+         # Go back to correct
+        return redirect(url_for('books.approved_books')) 
     except Exception as e:
-        logging.error(f"[books_bp POST /create_batch_shipment] Error inesperado: {e}", exc_info=True)
-        flash(f'Error inesperado del servidor al crear envío: {e}', 'error')
+        # Log message translated
+        logging.error(f"[books_bp POST /create_batch_shipment] Unexpected error: {e}", exc_info=True)
+        # Flash message translated
+        flash(f'Unexpected server error creating shipment: {e}', 'error')
         return redirect(url_for('books.approved_books'))
 
-    # 5. Redirigir a una página apropiada tras el éxito
-    # Podríamos redirigir a la lista de aprobados (donde ahora faltarán esos libros)
-    # o MEJOR AÚN, a la página de gestión de envíos/pipeline para ver la nueva transferencia.
-    # Asumimos que 'shipping_management' es la vista para ver transferencias (¡Aún no la hemos adaptado para eso!)
+    # 5. Redirect to an appropriate page after success
+    # Redirect to shipping management page to see the new transfer.
     return redirect(url_for('books.shipping_management'))
 
-# --- NUEVA RUTA: Confirmar Transferencia de Envío (POST) ---
-
+# --- NEW ROUTE: Confirm Shipment Transfer (POST) ---
 @books_bp.route('/confirm_shipment/<int:picking_id>', methods=['POST'])
 def confirm_shipment(picking_id):
     """
-    Ejecuta la acción 'action_confirm' en una transferencia (stock.picking)
-    para pasarla del estado 'draft' a 'waiting' o 'confirmed'.
+    Executes the 'action_confirm' action on a transfer (stock.picking)
+    to move it from 'draft' state to 'waiting' or 'confirmed'.
     """
-    logging.info(f"[books_bp POST /confirm_shipment] Solicitud para CONFIRMAR transferencia ID: {picking_id}")
+    # Log message translated
+    logging.info(f"[books_bp POST /confirm_shipment] Request to CONFIRM transfer ID: {picking_id}")
     client = get_odoo_client()
     if not client:
-        flash('Error conexión Odoo.', 'error')
+        # Flash message translated
+        flash('Odoo connection error.', 'error')
         return redirect(url_for('books.shipping_management'))
 
     try:
         PickingModel = client.env['stock.picking']
-        logging.info(f"Llamando a 'action_confirm' para picking ID {picking_id}")
-        # El método action_confirm no suele necesitar argumentos extra aquí
-        PickingModel.action_confirm([picking_id]) # Odoo 16 a menudo necesita lista de IDs
-        logging.info(f"¡Transferencia {picking_id} confirmada (o intento enviado)!")
-        # Leemos el nombre/ref para el mensaje
+        # Log message translated
+        logging.info(f"Calling 'action_confirm' for picking ID {picking_id}")
+        # action_confirm method usually doesn't need extra args here
+        # Odoo 16 often needs list of IDs
+        PickingModel.action_confirm([picking_id]) 
+        # Log message translated
+        logging.info(f"Transfer {picking_id} confirmed (or attempt sent)!")
+        # Read name/ref for message
         picking_ref = ""
         try:
             picking_info = PickingModel.read(picking_id, ['name'])
             if picking_info: picking_ref = picking_info[0].get('name', '')
         except Exception: pass
-        flash(f'Transferencia {picking_ref or picking_id} confirmada.', 'success')
+        # Flash message translated
+        flash(f'Transfer {picking_ref or picking_id} confirmed.', 'success')
 
     except odoorpc.error.RPCError as e:
-        logging.error(f"[books_bp POST /confirm_shipment] Error RPC: {e}", exc_info=True)
-        flash(f'Error RPC Odoo al confirmar transferencia {picking_id}: {e}', 'error')
+        # Log message translated
+        logging.error(f"[books_bp POST /confirm_shipment] RPC Error: {e}", exc_info=True)
+        # Flash message translated
+        flash(f'Odoo RPC Error confirming transfer {picking_id}: {e}', 'error')
     except Exception as e:
-        logging.error(f"[books_bp POST /confirm_shipment] Error inesperado: {e}", exc_info=True)
-        flash(f'Error inesperado al confirmar transferencia {picking_id}: {e}', 'error')
+        # Log message translated
+        logging.error(f"[books_bp POST /confirm_shipment] Unexpected error: {e}", exc_info=True)
+        # Flash message translated
+        flash(f'Unexpected error confirming transfer {picking_id}: {e}', 'error')
 
-    # Siempre redirigir de vuelta a la gestión de envíos para ver el cambio de estado
+    # Always redirect back to shipping management to see the status change
     return redirect(url_for('books.shipping_management'))
 
 
-# --- NUEVA RUTA: Reservar Stock para Transferencia (POST) ---
-
-@books_bp.route('/reserve_shipment/<int:picking_id>', methods=['POST']) # <-- ¡LA RUTA QUE FALTABA!
+# --- NEW ROUTE: Reserve Stock for Transfer (POST) ---
+@books_bp.route('/reserve_shipment/<int:picking_id>', methods=['POST']) # <-- THE MISSING ROUTE! -> Comment translated
 def reserve_shipment(picking_id):
     """
-    Ejecuta la acción 'action_assign' en una transferencia (stock.picking)
-    para intentar reservar el stock necesario.
-    Esto debería cambiar el estado a 'assigned' (listo) o 'confirmed'/'waiting' (si falta stock).
+    Executes the 'action_assign' action on a transfer (stock.picking)
+    to attempt to reserve the necessary stock.
+    This should change the state to 'assigned' (ready) or 'confirmed'/'waiting' (if stock is missing).
     """
-    logging.info(f"[books_bp POST /reserve_shipment] Solicitud para RESERVAR STOCK para transferencia ID: {picking_id}")
+    # Log message translated
+    logging.info(f"[books_bp POST /reserve_shipment] Request to RESERVE STOCK for transfer ID: {picking_id}")
     client = get_odoo_client()
     if not client:
-        flash('Error conexión Odoo. No se pudo reservar stock.', 'error')
+         # Flash message translated
+        flash('Odoo connection error. Could not reserve stock.', 'error')
         return redirect(url_for('books.shipping_management'))
 
     try:
         PickingModel = client.env['stock.picking']
-        logging.info(f"Llamando a 'action_assign' (Reservar Stock) para picking ID {picking_id}")
-        
-        # La acción action_assign intentará reservar. Odoo se encarga de la lógica interna.
-        PickingModel.browse(picking_id).action_assign() # En odoorpc, browse(id).accion() es común
+         # Log message translated
+        logging.info(f"Calling 'action_assign' (Reserve Stock) for picking ID {picking_id}")
 
-        logging.info(f"¡Intento de reserva de stock enviado para picking ID {picking_id}!")
-        
-        # Leer nombre/ref para mensaje
+        # action_assign action will attempt reservation. Odoo handles internal logic.
+        # In odoorpc, browse(id).action() is common
+        PickingModel.browse(picking_id).action_assign() 
+
+        # Log message translated
+        logging.info(f"Stock reservation attempt sent for picking ID {picking_id}!")
+
+        # Read name/ref for message
         picking_ref = f"ID {picking_id}"
         try:
             picking_info = PickingModel.read(picking_id, ['name'])
             if picking_info: picking_ref = picking_info[0].get('name', picking_ref)
         except Exception: pass
-        flash(f'Intento de reserva de stock iniciado para el envío {picking_ref}. Verifique el nuevo estado.', 'info') # Mensaje informativo
+        # Flash message translated (informational message)
+        flash(f'Stock reservation attempt initiated for shipment {picking_ref}. Check the new status.', 'info') 
 
     except odoorpc.error.RPCError as e:
-        picking_ref = f"ID {picking_id}" # Intentar obtener ref para error
+        # Try to get ref for error message
+        picking_ref = f"ID {picking_id}" 
         try:
             p_info = client.env['stock.picking'].read(picking_id, ['name'])
             if p_info: picking_ref = p_info[0].get('name', picking_ref)
         except Exception: pass
             
-        logging.error(f"[books_bp POST /reserve_shipment] Error RPC Odoo para '{picking_ref}': {e}", exc_info=True)
-        error_details = str(getattr(e, 'fault', e)) # Intentar obtener mensaje de error de Odoo
-        flash(f'Error de Odoo al intentar reservar stock para {picking_ref}: {error_details}', 'error')
+        # Log message translated
+        logging.error(f"[books_bp POST /reserve_shipment] Odoo RPC Error for '{picking_ref}': {e}", exc_info=True)
+        # Try to get error message from Odoo
+        error_details = str(getattr(e, 'fault', e)) 
+        # Flash message translated
+        flash(f'Odoo error attempting to reserve stock for {picking_ref}: {error_details}', 'error')
         
     except Exception as e:
         picking_ref = f"ID {picking_id}"
@@ -1094,253 +1356,306 @@ def reserve_shipment(picking_id):
             if p_info: picking_ref = p_info[0].get('name', picking_ref)
         except Exception: pass
             
-        logging.error(f"[books_bp POST /reserve_shipment] Error inesperado para '{picking_ref}': {e}", exc_info=True)
-        flash(f'Error inesperado al reservar stock para {picking_ref}: {e}', 'error')
+        # Log message translated
+        logging.error(f"[books_bp POST /reserve_shipment] Unexpected error for '{picking_ref}': {e}", exc_info=True)
+        # Flash message translated
+        flash(f'Unexpected error reserving stock for {picking_ref}: {e}', 'error')
 
-    # Siempre redirigir de vuelta a la gestión de envíos para ver el cambio de estado
+    # Always redirect back to shipping management to see the status change
     return redirect(url_for('books.shipping_management'))
 
 
-# --- RUTA ACTUALIZADA: REDIRIGE a mostrar detalles para validar ---
-
-@books_bp.route('/validate_shipment/<int:picking_id>', methods=['POST']) # Mantenemos POST por ahora por el form
+# --- UPDATED ROUTE: REDIRECTS to show details for validation ---
+@books_bp.route('/validate_shipment/<int:picking_id>', methods=['POST']) # Keep POST for now due to the form
 def validate_shipment(picking_id):
     """
-    TEMPORALMENTE: Redirige a la página de detalles de la transferencia
-    para introducir cantidades hechas.
-    En el futuro, esta podría ser la función que PROCESA la validación.
-    Pero para empezar, solo redirige.
+    TEMPORARILY: Redirects to the transfer details page
+    to enter done quantities.
+    In the future, this could be the function that PROCESSES validation.
+    But for now, it just redirects.
     """
-    logging.info(f"[books_bp POST /validate_shipment] Redirigiendo a vista de detalles para picking ID: {picking_id}")
-    # Simplemente redirigimos a una NUEVA ruta GET que mostrará los detalles
-    # Usaremos el mismo picking_id
+    # Log message translated
+    logging.info(f"[books_bp POST /validate_shipment] Redirecting to details view for picking ID: {picking_id}")
+    # Simply redirect to a NEW GET route that will show the details
+    # Use the same picking_id
     return redirect(url_for('books.show_picking_details', picking_id=picking_id))
 
 
-# --- NUEVA RUTA: Mostrar Detalles de una Transferencia (GET) ---
-
-@books_bp.route('/picking_details/<int:picking_id>') # Acepta GET por defecto
+# --- NEW ROUTE: Show Transfer Details (GET) ---
+@books_bp.route('/picking_details/<int:picking_id>') # Accepts GET by default
 def show_picking_details(picking_id):
     """
-    Muestra los detalles de una transferencia específica, incluyendo las
-    líneas de movimiento detalladas (stock.move.line) para poder introducir cantidades hechas.
+    Shows the details of a specific transfer, including the
+    detailed move lines (stock.move.line) to be able to enter done quantities.
     """
-    logging.info(f"[books_bp GET /picking_details] Mostrando detalles para picking ID: {picking_id}")
+     # Log message translated
+    logging.info(f"[books_bp GET /picking_details] Showing details for picking ID: {picking_id}")
 
     picking_data = None
-    move_lines = [] # Lista para las líneas/libros (ahora stock.move.line)
+    # List for lines/books (now stock.move.line)
+    move_lines = [] 
     error_message = None
 
     client = get_odoo_client()
     if not client:
-        flash('Error conexión Odoo. No se pueden cargar detalles del envío.', 'error')
-        error_message = "Error de conexión con Odoo."
-        # Intentamos renderizar igualmente para mostrar el error
-        # picking_data y move_lines seguirán siendo None/[]
+         # Flash message translated
+        flash('Odoo connection error. Cannot load shipment details.', 'error')
+         # Error message translated
+        error_message = "Odoo connection error."
+        # Try rendering anyway to show the error
+        # picking_data and move_lines will remain None/[]
     else:
-        # Si hay cliente, intentar obtener los datos
+        # If client exists, try getting data
         try:
             PickingModel = client.env['stock.picking']
-            # Leer la cabecera del picking
+            # Read picking header
             picking_fields = ['id', 'name', 'state', 'origin', 'location_id', 'location_dest_id', 'scheduled_date']
             picking_data_list = PickingModel.read(picking_id, fields=picking_fields)
 
             if not picking_data_list:
-                flash(f'Error: Transferencia con ID {picking_id} no encontrada.', 'error')
-                return redirect(url_for('books.shipping_management')) 
+                # Flash message translated
+                flash(f'Error: Transfer with ID {picking_id} not found.', 'error')
+                return redirect(url_for('books.shipping_management'))
 
             picking_data = picking_data_list[0]
-            logging.info(f"Datos de cabecera leídos para picking {picking_id}: {picking_data}")
+             # Log message translated
+            logging.info(f"Header data read for picking {picking_id}: {picking_data}")
 
-            # Leer las LÍNEAS DE MOVIMIENTO DETALLADAS (stock.move.line)
-            # Usamos el campo 'move_line_ids' del picking.
+            # Read DETAILED MOVE LINES (stock.move.line)
+            # Use the 'move_line_ids' field of the picking.
             picking_with_lines = PickingModel.read(picking_id, ['move_line_ids'])
             move_line_ids = []
             if picking_with_lines and picking_with_lines[0].get('move_line_ids'):
                 move_line_ids = picking_with_lines[0]['move_line_ids']
-            
-            logging.info(f"Buscando detalles de las LÍNEAS DETALLADAS (stock.move.line) IDs: {move_line_ids}")
+
+             # Log message translated
+            logging.info(f"Searching details of DETAILED LINES (stock.move.line) IDs: {move_line_ids}")
 
             if move_line_ids:
-                # Si encontramos IDs de líneas detalladas, las leemos
+                # If detailed line IDs are found, read them
                 MoveLineModel = client.env['stock.move.line']
-                line_fields = ['id', 'product_id', 'qty_done', 'product_uom_id', 'move_id'] 
+                line_fields = ['id', 'product_id', 'qty_done', 'product_uom_id', 'move_id']
                 move_lines = MoveLineModel.read(move_line_ids, fields=line_fields)
-                logging.info(f"Datos de {len(move_lines)} líneas detalladas (stock.move.line) leídos.")
+                 # Log message translated
+                logging.info(f"Data of {len(move_lines)} detailed lines (stock.move.line) read.")
             else:
-                # Si NO hay move_line_ids, es un aviso importante.
-                logging.warning(f"La transferencia {picking_id} no tiene LÍNEAS DETALLADAS (stock.move.line). ¿Se reservó stock con 'action_assign'?")
-                flash('Advertencia: No se encontraron los detalles de los libros para ingresar cantidades. Intenta "Reservar Stock" primero en la lista de envíos.', 'warning')
-                # move_lines ya está inicializada como [] arriba, no hace falta reasignarla aquí.
-        
-        # Bloques Except (correctamente indentados con el try)
+                 # If NO move_line_ids, it's an important warning.
+                 # Log message translated
+                logging.warning(f"Transfer {picking_id} has no DETAILED LINES (stock.move.line). Was stock reserved with 'action_assign'?")
+                 # Flash message translated
+                flash('Warning: Book details not found to enter quantities. Try "Reserve Stock" first in the shipment list.', 'warning')
+                # move_lines is already initialized as [] above, no need to reassign here.
+
+        # Except blocks (correctly indented with try)
         except odoorpc.error.RPCError as e:
-            logging.error(f"[books_bp GET /picking_details] Error RPC: {e}", exc_info=True)
-            error_message = f"Error RPC Odoo al cargar detalles del envío {picking_id}: {e}"
-            flash(error_message, 'error')
-            picking_data = None 
-            move_lines = [] # Asegurar listas vacías si hay error
-        except Exception as e:
-            logging.error(f"[books_bp GET /picking_details] Error inesperado: {e}", exc_info=True)
-            error_message = f"Error inesperado al cargar detalles del envío {picking_id}: {e}"
+             # Log message translated
+            logging.error(f"[books_bp GET /picking_details] RPC Error: {e}", exc_info=True)
+             # Error message translated
+            error_message = f"Odoo RPC Error loading shipment details {picking_id}: {e}"
             flash(error_message, 'error')
             picking_data = None
-            move_lines = [] # Asegurar listas vacías si hay error
+             # Ensure empty lists if error occurs
+            move_lines = [] 
+        except Exception as e:
+             # Log message translated
+            logging.error(f"[books_bp GET /picking_details] Unexpected error: {e}", exc_info=True)
+             # Error message translated
+            error_message = f"Unexpected error loading shipment details {picking_id}: {e}"
+            flash(error_message, 'error')
+            picking_data = None
+             # Ensure empty lists if error occurs
+            move_lines = [] 
 
-    # Renderizar plantilla (indentación correcta, fuera del try pero dentro del else principal)
-    # Pasamos 'picking' y 'lines' (que serán None/[] si hubo error o no se encontraron datos)
+    # Render template (correct indentation, outside try but inside main else)
+    # Pass 'picking' and 'lines' (which will be None/[] if error or no data found)
     return render_template('picking_details.html',
-                            picking=picking_data, 
-                            lines=move_lines, 
+                            picking=picking_data,
+                            lines=move_lines,
                             error_message=error_message)
 
 
-# --- NUEVA RUTA: Procesar Validación de Transferencia (con cantidades) ---
-
+# --- NEW ROUTE: Process Transfer Validation (with quantities) ---
 @books_bp.route('/process_validate_shipment/<int:picking_id>', methods=['POST'])
 def process_validate_shipment(picking_id):
     """
-    Procesa el formulario de detalles de transferencia:
-    1. Recibe las cantidades 'hechas' para cada línea de movimiento.
-    2. Actualiza las cantidades 'hechas' (qty_done) en las stock.move.line de Odoo.
-    3. Intenta llamar a 'button_validate' para marcar el picking como 'done'.
+    Processes the transfer details form:
+    1. Receives 'done' quantities for each move line.
+    2. Updates 'done' quantities (qty_done) on Odoo's stock.move.line.
+    3. Attempts to call 'button_validate' to mark the picking as 'done'.
     """
-    logging.info(f"[books_bp POST /process_validate] Procesando validación para picking ID: {picking_id}")
+    # Log message translated
+    logging.info(f"[books_bp POST /process_validate] Processing validation for picking ID: {picking_id}")
 
-    # 1. Extraer las cantidades del formulario
-    # El formulario envía pares: move_id=X, qty_done_X=Y
-    move_quantities = {} # Diccionario para guardar {move_id: qty_done}
-    move_ids_from_form = request.form.getlist('move_id') # Obtenemos todos los IDs de move enviados
+    # 1. Extract quantities from the form
+    # Form sends pairs: move_id=X, qty_done_X=Y
+    # Dictionary to store {move_id: qty_done}
+    move_quantities = {} 
+     # Get all submitted move IDs
+    move_ids_from_form = request.form.getlist('move_id') 
 
     if not move_ids_from_form:
-         flash("Error: No se recibieron datos de líneas de movimiento del formulario.", "error")
-         # Podríamos redirigir a los detalles o a la lista general
+        # Flash message translated
+         flash("Error: No move line data received from form.", "error")
+         # Redirecting to details or general list could be options
          return redirect(url_for('books.shipping_management')) 
-         
-    logging.debug(f"Move IDs recibidos del form: {move_ids_from_form}")
-    
+
+    # Log message translated
+    logging.debug(f"Move IDs received from form: {move_ids_from_form}")
+
     try:
         for move_id_str in move_ids_from_form:
             move_id = int(move_id_str)
-            qty_done_str = request.form.get(f'qty_done_{move_id}') # Obtiene la cantidad para ESTE move_id
+             # Get quantity for THIS move_id
+            qty_done_str = request.form.get(f'qty_done_{move_id}') 
             if qty_done_str is not None:
-                 qty_done = float(qty_done_str) # Usamos float por si acaso, aunque deberían ser enteros para libros
-                 if qty_done < 0: # Validación simple
-                     flash(f"Error: Cantidad hecha inválida ({qty_done}) para una de las líneas.", "error")
-                     # Volver a la página de detalles podría ser confuso sin pasar los datos de nuevo
-                     # Redirigimos a la lista general.
-                     return redirect(url_for('books.shipping_management')) 
+                # Use float just in case, though should be integers for books
+                 qty_done = float(qty_done_str) 
+                 # Simple validation
+                 if qty_done < 0: 
+                     # Flash message translated
+                     flash(f"Error: Invalid done quantity ({qty_done}) for one of the lines.", "error")
+                     # Returning to details page could be confusing without passing data back
+                     # Redirect to the general list.
+                     return redirect(url_for('books.shipping_management'))
                  move_quantities[move_id] = qty_done
-                 logging.debug(f"  Move ID {move_id}: Cantidad Hecha = {qty_done}")
+                  # Log message translated
+                 logging.debug(f"  Move ID {move_id}: Done Quantity = {qty_done}")
             else:
-                 # Esto no debería pasar si el input está en el form, pero por si acaso
-                 logging.warning(f"No se encontró la cantidad para move_id {move_id} en el formulario.")
-                 move_quantities[move_id] = 0 # Asumir 0 si falta
+                 # Shouldn't happen if input is in form, but just in case
+                 # Log message translated
+                 logging.warning(f"Quantity for move_id {move_id} not found in form.")
+                  # Assume 0 if missing
+                 move_quantities[move_id] = 0 
 
     except ValueError:
-        flash("Error: Formato numérico inválido en las cantidades.", 'error')
+         # Flash message translated
+        flash("Error: Invalid numeric format in quantities.", 'error')
         return redirect(url_for('books.shipping_management'))
 
-    if not move_quantities: # Si el diccionario quedó vacío por alguna razón
-         flash("Error: No se procesaron cantidades válidas del formulario.", "error")
-         return redirect(url_for('books.shipping_management')) 
-         
-    # --- Conexión a Odoo ---
+    # If dictionary remained empty for some reason
+    if not move_quantities: 
+         # Flash message translated
+         flash("Error: No valid quantities processed from form.", "error")
+         return redirect(url_for('books.shipping_management'))
+
+    # --- Odoo Connection ---
     client = get_odoo_client()
     if not client:
-        flash('Error conexión Odoo.', 'error')
+        # Flash message translated
+        flash('Odoo connection error.', 'error')
         return redirect(url_for('books.shipping_management'))
 
-    picking_ref = f"ID {picking_id}" # Para mensajes de error/éxito
+    # For error/success messages
+    picking_ref = f"ID {picking_id}" 
     try:
         PickingModel = client.env['stock.picking']
         MoveLineModel = client.env['stock.move.line']
 
-        # Leer nombre del picking para mensajes
+        # Read picking name for messages
         try:
             p_info = PickingModel.read(picking_id, ['name'])
             if p_info: picking_ref = p_info[0].get('name', picking_ref)
         except Exception: pass
 
-        logging.info(f"Validando picking '{picking_ref}'. Cantidades a actualizar: {move_quantities}")
+         # Log message translated
+        logging.info(f"Validating picking '{picking_ref}'. Quantities to update: {move_quantities}")
 
-        # 2. Encontrar las 'stock.move.line' IDs asociadas a nuestros 'stock.move' IDs y este picking
-        logging.info(f"Buscando 'stock.move.line' para picking {picking_id} y move IDs {list(move_quantities.keys())}")
-        # Buscamos move_line que pertenezcan al picking y cuyo move_id esté en nuestra lista
+        # 2. Find 'stock.move.line' IDs associated with our 'stock.move' IDs and this picking
+        # Log message translated
+        logging.info(f"Searching 'stock.move.line' for picking {picking_id} and move IDs {list(move_quantities.keys())}")
+        # Search for move_line belonging to the picking and whose move_id is in our list
         search_domain_ml = [
              ('picking_id', '=', picking_id),
-             ('move_id', 'in', list(move_quantities.keys())) 
+             ('move_id', 'in', list(move_quantities.keys()))
         ]
-        
-        # Leemos SOLO id y move_id para mapear la línea correcta
+
+        # Read ONLY id and move_id to map the correct line
         move_line_ids_data = MoveLineModel.search_read(search_domain_ml, fields=['id', 'move_id'])
 
         if not move_line_ids_data:
-             logging.error(f"No se encontraron stock.move.line correspondientes para picking {picking_id}.")
-             # Esto suele pasar si la transferencia no está en estado 'assigned' o 'ready' aún
-             # o si algo falló al confirmar/reservar.
-             flash(f"Error: No se encontraron las líneas detalladas para procesar el envío '{picking_ref}'. ¿Está el stock reservado?", "error")
-             # Redirigir a los detalles podría mostrar la misma página vacía. Mejor a la lista.
+             # Log message translated
+             logging.error(f"No corresponding stock.move.line found for picking {picking_id}.")
+             # Usually happens if transfer is not in 'assigned' or 'ready' state yet
+             # or if something failed during confirm/reserve.
+             # Flash message translated
+             flash(f"Error: Detailed lines not found to process shipment '{picking_ref}'. Is stock reserved?", "error")
+             # Redirecting to details might show the same empty page. List is better.
              return redirect(url_for('books.shipping_management')) 
 
-        logging.info(f"{len(move_line_ids_data)} stock.move.line encontradas.")
+         # Log message translated
+        logging.info(f"{len(move_line_ids_data)} stock.move.line found.")
 
-        # 3. Preparar los comandos 'write' para actualizar qty_done en stock.move.line
-        # Odoo usa el formato: [(1, move_line_id, {'field_to_update': new_value}), ...]
-        # dentro de una escritura al registro padre (stock.picking) en el campo One2many/Many2many.
-        # ¡¡IMPORTANTE!! Odoo espera estos comandos en el campo 'move_line_ids'.
-        
+        # 3. Prepare 'write' commands to update qty_done on stock.move.line
+        # Odoo uses format: [(1, move_line_id, {'field_to_update': new_value}), ...]
+        # within a write to the parent record (stock.picking) on the One2many/Many2many field.
+        # IMPORTANT!! Odoo expects these commands on the 'move_line_ids' field.
+
         write_commands = []
         for ml in move_line_ids_data:
             move_line_id = ml['id']
-            parent_move_id = ml['move_id'][0] # Obtenemos el ID del stock.move padre
-            # Buscamos la cantidad que el usuario introdujo para ESE stock.move padre
-            qty_to_set = move_quantities.get(parent_move_id, 0) # Usar 0 si no se encontró por alguna razón
-            
+            # Get the parent stock.move ID
+            parent_move_id = ml['move_id'][0] 
+            # Find the quantity user entered for THAT parent stock.move
+             # Use 0 if not found for some reason
+            qty_to_set = move_quantities.get(parent_move_id, 0) 
+
             command = (1, move_line_id, {'qty_done': qty_to_set})
             write_commands.append(command)
-            logging.debug(f"  Comando write preparado para move_line ID {move_line_id}: {command}")
+             # Log message translated
+            logging.debug(f"  Write command prepared for move_line ID {move_line_id}: {command}")
 
-        # 4. Ejecutar el WRITE en el stock.picking para actualizar las líneas
-        logging.info(f"Intentando write en picking ID {picking_id} con comandos: {write_commands}")
+        # 4. Execute WRITE on stock.picking to update lines
+        # Log message translated
+        logging.info(f"Attempting write on picking ID {picking_id} with commands: {write_commands}")
         write_ok = PickingModel.write([picking_id], {'move_line_ids': write_commands})
-        
+
         if not write_ok:
-             # Esto sería muy raro si no da excepción, pero puede pasar.
-             logging.error(f"Odoo write para actualizar qty_done en picking {picking_id} no confirmó éxito.")
-             flash(f"Error: Odoo no confirmó la actualización de cantidades para el envío '{picking_ref}'. No se validó.", 'error')
+             # Very rare if no exception, but can happen.
+             # Log message translated
+             logging.error(f"Odoo write to update qty_done on picking {picking_id} did not confirm success.")
+             # Flash message translated
+             flash(f"Error: Odoo did not confirm quantity updates for shipment '{picking_ref}'. Validation aborted.", 'error')
              return redirect(url_for('books.shipping_management'))
 
-        logging.info(f"Cantidades 'quantity_done' actualizadas en Odoo para picking {picking_id}.")
+        # Log message translated
+        logging.info(f"'quantity_done' amounts updated in Odoo for picking {picking_id}.")
 
-        # 5. SI el write tuvo éxito, AHORA sí intentamos validar
-        logging.info(f"Intentando llamar a 'button_validate' para picking '{picking_ref}' (después de actualizar qty_done)")
+        # 5. IF write succeeded, NOW attempt validation
+         # Log message translated
+        logging.info(f"Attempting to call 'button_validate' for picking '{picking_ref}' (after updating qty_done)")
         validation_result = PickingModel.button_validate([picking_id])
-        logging.info(f"'button_validate' ejecutado para '{picking_ref}'. Resultado: {validation_result}")
-        
-        flash(f'¡Envío {picking_ref} validado y completado con éxito!', 'success')
+         # Log message translated
+        logging.info(f"'button_validate' executed for '{picking_ref}'. Result: {validation_result}")
+
+        # Flash message translated
+        flash(f'Shipment {picking_ref} validated and completed successfully!', 'success')
 
 
     except odoorpc.error.RPCError as e:
-        # Manejo de errores RPC (igual que antes)
-        logging.error(f"[books_bp POST /process_validate] Error RPC Odoo procesando '{picking_ref}': {e}", exc_info=True)
+        # RPC error handling (same as before)
+        # Log message translated
+        logging.error(f"[books_bp POST /process_validate] Odoo RPC Error processing '{picking_ref}': {e}", exc_info=True)
         error_message_from_odoo = str(e.args[0]) if e.args and isinstance(e.args[0], str) else str(e)
         if error_message_from_odoo:
+             # Get first line of error message
              error_message_from_odoo = error_message_from_odoo.split('\n')[0] 
-             flash(f"Error de Odoo al validar '{picking_ref}': {error_message_from_odoo}", 'error')
-        else: 
-            flash(f"Error RPC Odoo al validar transferencia '{picking_ref}'.", 'error')
-        # Considera redirigir a los detalles para reintentar? O a la lista? Lista es más seguro.
-        # return redirect(url_for('books.show_picking_details', picking_id=picking_id)) # <-- Para reintentar
-        return redirect(url_for('books.shipping_management')) # <-- A la lista general
-        
+             # Flash message translated
+             flash(f"Odoo error validating '{picking_ref}': {error_message_from_odoo}", 'error')
+        else:
+            # Flash message translated
+            flash(f"Odoo RPC Error validating transfer '{picking_ref}'.", 'error')
+        # Consider redirecting to details to retry? Or list? List is safer.
+        # return redirect(url_for('books.show_picking_details', picking_id=picking_id)) # <-- To retry
+         # <-- To general list
+        return redirect(url_for('books.shipping_management')) 
+
     except Exception as e:
-        logging.error(f"[books_bp POST /process_validate] Error inesperado procesando '{picking_ref}': {e}", exc_info=True)
-        flash(f'Error inesperado del servidor al validar envío.', 'error')
+         # Log message translated
+        logging.error(f"[books_bp POST /process_validate] Unexpected error processing '{picking_ref}': {e}", exc_info=True)
+         # Flash message translated
+        flash(f'Unexpected server error validating shipment.', 'error')
         return redirect(url_for('books.shipping_management'))
 
-    # 6. Redirección final
-    # Redirigir a la lista general para ver el estado 'done'
+    # 6. Final redirection
+    # Redirect to general list to see 'done' status
     return redirect(url_for('books.shipping_management'))
-
-

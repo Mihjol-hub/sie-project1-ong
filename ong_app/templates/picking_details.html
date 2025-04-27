@@ -1,117 +1,135 @@
+<!-- ong_app/templates/picking_details.html (Translated) -->
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en"> {# Language set to English #}
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Detalle Envío {{ picking.name if picking else 'N/E' }}</title>
+     <!-- Title translated, keeps dynamic part -->
+    <title>Shipment Detail {{ picking.name if picking else 'N/A' }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="container">
         {% if picking %}
-            <h1>Detalle Envío: {{ picking.name }}</h1>
+             <!-- Header translated -->
+            <h1>Shipment Detail: {{ picking.name }}</h1>
             <div class="shipment-header-details" style="margin-bottom: 20px; padding: 15px; background-color:#f8f9fa; border: 1px solid #eee; border-radius: 5px;">
-                <p><strong>Estado Odoo:</strong> {{ picking.state }}</p>
-                <p><strong>Origen:</strong> {{ picking.location_id[1] if picking.location_id else 'N/A' }}</p>
-                <p><strong>Destino:</strong> {{ picking.location_dest_id[1] if picking.location_dest_id else 'N/A' }}</p>
-                <p><strong>Fecha Prevista:</strong> {{ picking.scheduled_date if picking.scheduled_date else '-' }}</p>
+                 <!-- Labels translated -->
+                <p><strong>Odoo Status:</strong> {{ picking.state }}</p>
+                <p><strong>Source:</strong> {{ picking.location_id[1] if picking.location_id else 'N/A' }}</p>
+                <p><strong>Destination:</strong> {{ picking.location_dest_id[1] if picking.location_dest_id else 'N/A' }}</p>
+                <p><strong>Scheduled Date:</strong> {{ picking.scheduled_date if picking.scheduled_date else '-' }}</p>
                 {% if picking.origin %}
-                <p><strong>Origen Documento:</strong> {{ picking.origin }}</p>
+                <p><strong>Document Source:</strong> {{ picking.origin }}</p>
                 {% endif %}
             </div>
         {% else %}
-            <h1>Detalle de Envío</h1>
-            <p class="error-msg">No se pudieron cargar los datos principales del envío.</p>
+             <!-- Header translated -->
+            <h1>Shipment Detail</h1>
+             <!-- Error message translated -->
+            <p class="error-msg">Could not load the main shipment data.</p>
         {% endif %}
 
-        <!-- Mensajes Flash y Error -->
+        <!-- Flash Messages and Error (Structure unchanged) -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                  <div class="flash-messages">
                     {% for category, message in messages %}
+                         {# Message comes translated from Flask #}
                         <div class="flash-message flash-{{ category }}">{{ message }}</div>
                     {% endfor %}
                  </div>
             {% endif %}
         {% endwith %}
         {% if error_message %}
-            <p class="error-msg">Error al cargar líneas: {{ error_message }}</p>
+            <!-- Error prefix translated -->
+            <p class="error-msg">Error loading lines: {{ error_message }}</p>
         {% endif %}
 
-        {# Formulario para enviar cantidades hechas y validar #}
+        {# Form to submit done quantities and validate Translated comment #}
         <form action="{{ url_for('books.process_validate_shipment', picking_id=(picking.id if picking else 0)) }}" method="POST">
 
-            <h2>Libros a Enviar:</h2>
-            {# Verificamos si HAY líneas Y SI NO hay error de carga para mostrar tabla #}
+             <!-- Header translated -->
+            <h2>Books to Ship:</h2>
+            {# Check if there ARE lines AND NO loading error to show table Translated comment #}
             {% if lines and not error_message %}
                 <table class="table-standard">
                     <thead>
                         <tr>
-                            <th>Libro (Producto)</th>
-                            <th style="width: 100px; text-align: right;">Cant. Demandada</th>
-                            <th style="width: 150px;">Cant. Hecha (Done)</th>
+                            <!-- Table headers translated -->
+                            <th>Book (Product)</th>
+                            <th style="width: 100px; text-align: right;">Demand</th>
+                            <th style="width: 150px;">Done Qty</th>
                         </tr>
                     </thead>
                     <tbody>
-                         {% for line in lines %} {# Bucle sobre las líneas (stock.move.line) #}
+                         {# Loop over lines (stock.move.line) Translated comment #}
+                         {% for line in lines %} 
                          <tr>
                              <td>
-                                 {# Muestra nombre e ID del producto - OK #}
-                                 {{ line.product_id[1] if line.product_id else 'Producto Desconocido' }} 
-                                 (ID Prod: {{ line.product_id[0] if line.product_id else 'N/A' }})
+                                 {# Shows product name and ID - OK Translated comment #}
+                                 {# Unknown Product text translated #}
+                                 {{ line.product_id[1] if line.product_id else 'Unknown Product' }} 
+                                 {# Product ID label translated #}
+                                 (Prod ID: {{ line.product_id[0] if line.product_id else 'N/A' }})
                              </td>
                              <td style="text-align: right;">
-                                 {# Eliminamos la referencia a line.quantity que causaba el error #}
-                                 {# Podríamos mostrar demanda desde stock.move más tarde si es necesario #}
-                                 (Demanda: N/A) {# Placeholder temporal #}
-                                 {{ line.product_uom_id[1] if line.product_uom_id else '' }} {# Unidad - OK #}
+                                 {# Removed reference to line.quantity which caused the error Translated comment #}
+                                 {# We could show demand from stock.move later if needed Translated comment #}
+                                 {# Temporary placeholder translated #}
+                                 (Demand: N/A) 
+                                  {# Unit - OK Translated comment #}
+                                 {{ line.product_uom_id[1] if line.product_uom_id else '' }}
                              </td>
                              <td>
-                                 {# --- INICIO BLOQUE INPUT CORREGIDO --- #}
+                                 {# --- START CORRECTED INPUT BLOCK --- Translated comment #}
 
-                                 {# Input principal para Cantidad Hecha ('qty_done') #}
-                                 {# El 'name' AHORA usa el ID del stock.move padre (line.move_id[0]) #}
-                                 {# que es lo que process_validate_shipment busca actualmente #}
+                                 {# Main input for Done Quantity ('qty_done') Translated comment #}
+                                 {# 'name' NOW uses the parent stock.move ID (line.move_id[0]) Translated comment #}
+                                 {# which is what process_validate_shipment currently looks for Translated comment #}
                                  <input type="number" name="qty_done_{{ line.move_id[0] }}" 
-                                        {# El 'value' inicial AHORA usa line.qty_done que sí existe #}
+                                        {# Initial 'value' NOW uses line.qty_done which exists Translated comment #}
                                         value="{{ "%.0f"|format(line.qty_done) }}" 
                                         step="1" min="0" required
                                         style="width: 100px; text-align: right; padding: 5px;">
                                  
-                                 {# Input oculto para enviar el ID del stock.move padre #}
-                                 {# Esto es para que request.form.getlist('move_id') funcione #}
+                                 {# Hidden input to send the parent stock.move ID Translated comment #}
+                                 {# This is so request.form.getlist('move_id') works Translated comment #}
                                  <input type="hidden" name="move_id" value="{{ line.move_id[0] }}">
 
-                                 {# OPCIONAL PERO RECOMENDADO: Enviar también el move_line_id por si #}
-                                 {# refactorizamos Python para buscar por él directamente #}
+                                 {# OPTIONAL BUT RECOMMENDED: Also send move_line_id in case Translated comment #}
+                                 {# we refactor Python to search by it directly Translated comment #}
                                  {# <input type="hidden" name="assoc_move_line_id_{{ line.move_id[0] }}" value="{{ line.id }}"> #}
-                                 {# Por ahora lo dejamos comentado para no complicar #}
+                                 {# Commented out for now to avoid complication Translated comment #}
 
-                                 {# --- FIN BLOQUE INPUT CORREGIDO --- #}
+                                 {# --- END CORRECTED INPUT BLOCK --- Translated comment #}
                              </td>
                          </tr>
-                         {% endfor %} {# Fin del bucle sobre las líneas #}
+                         {% endfor %} {# End loop over lines Translated comment #}
                      </tbody>
                         
                 </table>
 
-                {# Botones dentro del if lines #}
+                {# Buttons inside if lines Translated comment #}
                 <div class="form-actions">
-                     <button type="submit" class="btn btn-success">✔️ Confirmar Cantidades y Validar Envío</button>
-                     <a href="{{ url_for('books.shipping_management') }}" class="btn">Cancelar / Volver a Lista</a>
+                      <!-- Button texts translated -->
+                     <button type="submit" class="btn btn-success">✔️ Confirm Quantities and Validate Shipment</button>
+                     <a href="{{ url_for('books.shipping_management') }}" class="btn">Cancel / Back to List</a>
                 </div>
 
-            {# Si no hay líneas pero NO hubo error de carga #}
+            {# If no lines but NO loading error Translated comment #}
             {% elif not error_message %}
-                <p class="no-items">No se encontraron libros (líneas de movimiento) en esta transferencia.</p>
+                 <!-- Text translated -->
+                <p class="no-items">No books (move lines) found in this transfer.</p>
                  <div class="form-actions" style="text-align: left; border-top: none; margin-top: 10px;">
-                     <a href="{{ url_for('books.shipping_management') }}" class="btn">Volver a Lista</a>
+                      <!-- Button text translated -->
+                     <a href="{{ url_for('books.shipping_management') }}" class="btn">Back to List</a>
                  </div>
-             {# Si hubo error de carga (error_message tiene valor) #}
-             {# No necesitamos 'else' aquí porque el error ya se muestra arriba #}
-            {% endif %} {# Fin del if lines #}
+             {# If there was a loading error (error_message has value) Translated comment #}
+             {# No 'else' needed here as error is already shown above Translated comment #}
+            {% endif %} {# End if lines #}
 
-        </form> {# Fin del formulario de validación #}
+        </form> {# End validation form #}
     </div>
 </body>
 </html>

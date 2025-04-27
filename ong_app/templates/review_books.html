@@ -1,40 +1,45 @@
-<!-- ong_app/templates/review_books.html (VERSIÓN FINAL CON btn-danger) -->
+<!-- ong_app/templates/review_books.html (FINAL VERSION WITH btn-danger & TRANSLATED) -->
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en"> {# Language set to English #}
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Revisar Libros Donados</title>
+    <!-- Title translated -->
+    <title>Review Donated Books</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="container">
-        <h1>Libros Pendientes de Revisión</h1>
+        <!-- Header translated -->
+        <h1>Books Pending Review</h1>
 
-        <!-- Mensajes Flash -->
+        <!-- Flash Messages (Structure unchanged) -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
+                     {# Message comes translated from Flask #}
                     <div class="flash-message flash-{{ category }}">{{ message }}</div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
 
-        <!-- Mensaje de Error Carga -->
+        <!-- Loading Error Message (Structure unchanged) -->
         {% if error_message %}
-            <p class="error-msg">Error al cargar la lista: {{ error_message }}</p>
+            <!-- Error prefix translated -->
+            <p class="error-msg">Error loading list: {{ error_message }}</p>
         {% endif %}
 
-        <!-- Tabla de Libros Pendientes -->
+        <!-- Table of Pending Books -->
         {% if books %}
             <table>
                 <thead>
                     <tr>
-                        <th>ID Odoo</th>
-                        <th>Título</th>
-                        <th>ISBN (Ref. Interna)</th>
-                        <th>Notas (Autor/Donante)</th>
-                        <th>Acciones</th>  
+                         <!-- Table headers translated -->
+                        <th>Odoo ID</th>
+                        <th>Title</th>
+                        <th>ISBN (Internal Ref.)</th>
+                        <th>Notes (Author/Donor)</th>
+                        <th>Actions</th>  
                     </tr>
                 </thead>
                 <tbody>
@@ -43,16 +48,19 @@
                         <td>{{ book.id }}</td>
                         <td>{{ book.name }}</td>
                         <td>{{ book.default_code if book.default_code else '-' }}</td>
-                        <td>{{ book.description if book.description else '-' }}</td>
+                        {# Check if 'description_sale' or 'description' holds Author/Donor notes #}
+                        <td>{{ book.description_sale if book.description_sale else (book.description if book.description else '-') }}</td>
                         
-                        {# Celda TD con la clase "actions-cell" #}
+                        {# TD cell with "actions-cell" class #}
                         <td class="actions-cell"> 
                             <form action="{{ url_for('books.approve_book', book_id=book.id) }}" method="POST" style="display: inline;">
-                                <button type="submit" class="btn btn-success">Aprobar</button>
+                                 <!-- Button text translated -->
+                                <button type="submit" class="btn btn-success">Approve</button>
                             </form>
                             <form action="{{ url_for('books.reject_book', book_id=book.id) }}" method="POST" style="display: inline;">
-                                {# Clase corregida a btn-danger #}
-                                <button type="submit" class="btn btn-danger">Rechazar</button> 
+                                {# Corrected class to btn-danger #}
+                                 <!-- Button text translated -->
+                                <button type="submit" class="btn btn-danger">Reject</button> 
                             </form>
                         </td>
                     </tr>
@@ -60,13 +68,15 @@
                 </tbody>
             </table>
         {% elif not error_message %}
-             <p class="no-items">No hay libros pendientes de revisión.</p>
+             <!-- Text translated -->
+             <p class="no-items">No books pending review.</p>
         {% endif %}
 
         <hr>
-        {# Botón "Volver a Inicio" con estilo consistente #}
+        {# "Back to Home" button with consistent style Translated comment #}
         <div class="form-actions" style="text-align: left;">
-             <a href="{{ url_for('main.index') }}" class="btn">Volver a Inicio</a> 
+             <!-- Button text translated -->
+             <a href="{{ url_for('main.index') }}" class="btn">Back to Home</a> 
         </div>
     </div>
 </body>

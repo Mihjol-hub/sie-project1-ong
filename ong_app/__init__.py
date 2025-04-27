@@ -3,64 +3,74 @@ import os
 from flask import Flask
 import logging
 
-# Importar los blueprints desde los otros archivos
+# Import blueprints from other files Comment translated
 from .routes_main import main_bp
 from .routes_books import books_bp
 from .routes_donors import donors_bp
 from .routes_donations import donations_bp
 
-# (Añadiremos más imports aquí si creamos más blueprints)
+# (We'll add more imports here if we create more blueprints) Comment translated
 
 def create_app(test_config=None):
-    """Factory function para crear y configurar la app Flask."""
+    """Factory function to create and configure the Flask app.""" # Docstring translated
 
-    # Crear e configurar la app
+    # Create and configure the app Comment translated
     app = Flask(__name__, instance_relative_config=True)
 
-    # Configuración por defecto
+    # Default configuration Comment translated
     app.config.from_mapping(
-        SECRET_KEY=os.environ.get('SECRET_KEY', 'dev_secret_key_change_this_later!')
+        SECRET_KEY=os.environ.get('SECRET_KEY', 'dev_secret_key_change_this_later!') # Default kept in English
     )
 
-    # Asegurar que la carpeta 'instance' exista
+    # Ensure the 'instance' folder exists Comment translated
     try:
         os.makedirs(app.instance_path)
     except OSError:
         pass
 
-    # Configurar el logging básico
-    # Es importante hacerlo ANTES de empezar a usar logging dentro de la app
+    # Configure basic logging Comment translated
+    # It's important to do this BEFORE starting to use logging within the app Comment translated
     logging.basicConfig(level=logging.INFO)
-    logging.info("Aplicación Flask creada (create_app inicio).")
+    # Log message translated
+    logging.info("Flask application created (create_app start).")
 
-    # --- Registrar los Blueprints (con logs detallados) ---
+    # --- Register Blueprints (with detailed logs) --- Comment translated
     try:
-        logging.info("Intentando registrar main_bp...")
+        # Log message translated
+        logging.info("Attempting to register main_bp...")
         app.register_blueprint(main_bp)
-        logging.info(">>> main_bp registrado con éxito.")
+        # Log message translated
+        logging.info(">>> main_bp registered successfully.")
 
-        logging.info("Intentando registrar books_bp...")
+        # Log message translated
+        logging.info("Attempting to register books_bp...")
         app.register_blueprint(books_bp) 
-        logging.info(">>> books_bp registrado con éxito.")
+        # Log message translated
+        logging.info(">>> books_bp registered successfully.")
 
-        logging.info("Intentando registrar donors_bp...")
+        # Log message translated
+        logging.info("Attempting to register donors_bp...")
         app.register_blueprint(donors_bp) 
-        logging.info(">>> donors_bp registrado con éxito.")
+        # Log message translated
+        logging.info(">>> donors_bp registered successfully.")
 
-        logging.info("Intentando registrar donations_bp...")
+        # Log message translated
+        logging.info("Attempting to register donations_bp...")
         app.register_blueprint(donations_bp, url_prefix='/donations') 
-        logging.info(">>> donations_bp registrado con éxito con prefijo /donations.")
-    
-    
-    
+        # Log message translated
+        logging.info(">>> donations_bp registered successfully with prefix /donations.")
+        
     except Exception as e:
-        # Si algo falla aquí, es CRÍTICO saberlo
-        logging.error(f"¡¡¡ERROR FATAL AL REGISTRAR BLUEPRINT!!!: {e}", exc_info=True)
+        # If something fails here, it's CRITICAL to know Comment translated
+        # Log message translated
+        logging.error(f"FATAL ERROR REGISTERING BLUEPRINT!!!: {e}", exc_info=True)
 
-    # Ruta de prueba opcional
+    # Optional test route Comment translated
     @app.route('/hello-init')
     def hello():
-        return '¡Hola desde create_app()!'
+        # Message translated
+        return 'Hello from create_app()!'
 
-    logging.info("create_app finalizado, devolviendo instancia de app.")
+    # Log message translated
+    logging.info("create_app finished, returning app instance.")
     return app

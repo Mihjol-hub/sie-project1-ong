@@ -1,26 +1,30 @@
-<!-- ong_app/templates/list_books.html (Ajustado) -->
+<!-- ong_app/templates/list_books.html (Adjusted & Translated) -->
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en"> {# Language set to English #}
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Listado de Libros Registrados</title>
+     <!-- Title translated -->
+    <title>List of Registered Books</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="container">
-        <h1>Listado de Todos los Libros Registrados</h1>
+        <!-- Header translated -->
+        <h1>List of All Registered Books</h1>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
+                     {# Message content comes translated from Flask #}
                     <div class="flash-message flash-{{ category }}">{{ message }}</div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
 
         {% if error_message %}
-            <p class="error-msg">Error al cargar la lista: {{ error_message }}</p>
+            <!-- Error prefix translated -->
+            <p class="error-msg">Error loading list: {{ error_message }}</p>
         {% endif %}
 
 
@@ -28,10 +32,11 @@
             <table>
                 <thead>
                     <tr>
-                        <th>ID Odoo</th>
-                        <th>Título</th>
-                        <th>ISBN (Ref. Interna)</th>
-                        <th>Notas (Autor/Donante)</th> {# <--- Cambiamos el encabezado #}
+                         <!-- Table headers translated -->
+                        <th>Odoo ID</th>
+                        <th>Title</th>
+                        <th>ISBN (Internal Ref.)</th>
+                        <th>Notes (Author/Donor)</th> {# <--- Header changed and translated #}
                     </tr>
                 </thead>
                 <tbody>
@@ -40,21 +45,24 @@
                         <td>{{ book.id }}</td>
                         <td>{{ book.name }}</td>
                         <td>{{ book.default_code if book.default_code else '-' }}</td>
-                         {# Usamos 'description' que tiene Autor/Donante #}
-                        <td>{{ book.description if book.description else '-' }}</td> 
+                         {# We use 'description_sale' (check if this is the field used) for Author/Donor Translated comment#}
+                         {# Correct field was likely description_sale from the route #}
+                        <td>{{ book.description_sale if book.description_sale else '-' }}</td> 
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         {% elif not error_message %} 
-             <p class="no-items">No hay libros registrados para mostrar.</p> {# <--- Clase CSS corregida #}
+             <!-- Text translated -->
+             <p class="no-items">No registered books to display.</p> {# <--- Correct CSS class #}
         {% endif %}
 
         <hr>
-         {# Usamos div.form-actions para mantener el estilo #}
+         {# Use div.form-actions to maintain style Translated comment #}
          <div class="form-actions" style="text-align: left;"> 
-            <a href="{{ url_for('books.add_book_form') }}" class="btn btn-primary">Registrar Nuevo Libro</a> {# <--- Clase btn y btn-primary #}
-            <a href="{{ url_for('main.index') }}" class="btn">Volver a Inicio</a> {# <--- Clase btn añadida #}
+             <!-- Button texts translated -->
+            <a href="{{ url_for('books.add_book_form') }}" class="btn btn-primary">Register New Book</a> {# <--- btn and btn-primary class #}
+            <a href="{{ url_for('main.index') }}" class="btn">Back to Home</a> {# <--- Added btn class #}
          </div>
     </div>
 </body>

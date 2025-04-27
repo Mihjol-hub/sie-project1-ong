@@ -1,29 +1,33 @@
-# Dockerfile (REESTRUCTURADO)
-# 1. Usar una imagen base oficial de Python
+# Dockerfile (RESTRUCTURED & TRANSLATED)
+
+# 1. Use an official Python base image Translated comment
 FROM python:3.10-slim
 
-# 2. Variables de entorno para Python
-ENV PYTHONDONTWRITEBYTECODE 1 # Evita crear archivos .pyc
-ENV PYTHONUNBUFFERED 1    # Asegura que los prints/logs salgan directo a la consola
+# 2. Environment variables for Python Translated comment
+# Avoids creating .pyc files Translated comment
+ENV PYTHONDONTWRITEBYTECODE 1 
+# Ensures prints/logs output directly to console Translated comment
+ENV PYTHONUNBUFFERED 1    
 
-# 3. Establecer el directorio de trabajo
-WORKDIR /app # Mantenemos /app como workdir
+# 3. Set the working directory Translated comment
+# Keeping /app as workdir Translated comment
+WORKDIR /app 
 
-# 4. Instalar dependencias
-# Copia solo requirements.txt primero para caché de Docker
+# 4. Install dependencies Translated comment
+# Copy only requirements.txt first for Docker cache Translated comment
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 5. Copiar el resto de la aplicación
-# Copia la carpeta ong_app y el script run.py
+# 5. Copy the rest of the application Translated comment
+# Copy the ong_app folder and the run.py script Translated comment
 COPY ong_app/ ./ong_app/
 COPY run.py .
 
-# 6. Exponer el puerto
+# 6. Expose the port Translated comment
 EXPOSE 5000
 
-# 7. Comando para ejecutar la aplicación
-# Ejecuta el script run.py que a su vez inicia Flask
-# Flask ahora se configura dentro de create_app()
-# Dockerfile (CMD MODIFICADO)
+# 7. Command to run the application Translated comment
+# Executes the run.py script which in turn starts Flask Translated comment
+# Flask is now configured within create_app() Translated comment
+# Dockerfile (CMD KEPT AS IS)
 CMD ["flask", "run", "--host=0.0.0.0", "--port=5000"]

@@ -1,41 +1,48 @@
+<!-- ong_app/templates/shipping_management.html (Translated) -->
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en"> {# Language set to English #}
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestión de Envíos - ONG</title>
+    <!-- Title translated -->
+    <title>Shipment Management - NGO</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="container">
-        <h1>Gestión de Envíos (Transferencias)</h1>
-        <p>Lista de envíos de lote creados. Desde aquí puedes confirmar y validar los envíos.</p>
+        <!-- Header translated -->
+        <h1>Shipment Management (Transfers)</h1>
+        <!-- Paragraph translated -->
+        <p>List of created batch shipments. From here you can confirm and validate shipments.</p>
 
-        <!-- Mensajes Flash y Error -->
+        <!-- Flash Messages and Error (Structure unchanged) -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                  <div class="flash-messages">
                     {% for category, message in messages %}
+                         {# Message comes translated from Flask #}
                         <div class="flash-message flash-{{ category }}">{{ message }}</div>
                     {% endfor %}
                  </div>
             {% endif %}
         {% endwith %}
         {% if error_message %}
-            <p class="error-msg">Error al cargar la lista de envíos: {{ error_message }}</p>
+            <!-- Error prefix translated -->
+            <p class="error-msg">Error loading shipment list: {{ error_message }}</p>
         {% endif %}
 
-        <!-- Tabla de Transferencias -->
+        <!-- Transfers Table -->
         {% if shipments %}
             <table class="table-standard">
                 <thead>
                     <tr>
-                        <th>Referencia</th>
-                        <th>Fecha Prevista</th>
-                        <th>Origen</th>
-                        <th>Destino</th>
-                        <th>Estado Odoo</th>
-                        <th style="min-width: 180px;">Acciones</th> {# Ancho mínimo para botones #}
+                         <!-- Table headers translated -->
+                        <th>Reference</th>
+                        <th>Scheduled Date</th>
+                        <th>Source</th>
+                        <th>Destination</th>
+                        <th>Odoo Status</th>
+                        <th style="min-width: 180px;">Actions</th> {# Minimum width for buttons #}
                     </tr>
                 </thead>
                 <tbody>
@@ -46,62 +53,76 @@
                         <td>{{ shipment.location_id[1] if shipment.location_id else 'N/A' }}</td>
                         <td>{{ shipment.location_dest_id[1] if shipment.location_dest_id else 'N/A' }}</td>
                         <td>
-                            {# Poner estilo simple según el estado #}
+                            {# Simple style based on state - Status text inside <span> is updated #}
                             {% set state_style = 'color: grey;' %}
+                            {% set state_text = shipment.state %}
                             {% if shipment.state == 'draft' %}
-                                {% set state_style = 'color: #6c757d; font-style: italic;' %} {# Gris/itálica para borrador #}
+                                {% set state_style = 'color: #6c757d; font-style: italic;' %} {# Grey/italic for draft #}
+                                {% set state_text = 'Draft' %}
                             {% elif shipment.state == 'waiting' or shipment.state == 'confirmed' %}
-                                {% set state_style = 'color: #17a2b8;' %} {# Azul claro para espera/confirmado #}
+                                {% set state_style = 'color: #17a2b8;' %} {# Light blue for waiting/confirmed #}
+                                {% set state_text = shipment.state.capitalize() %} {# Capitalize 'waiting' or 'confirmed' #}
                             {% elif shipment.state == 'assigned' or shipment.state == 'ready' %}
-                                {% set state_style = 'color: orange; font-weight: bold;' %} {# Naranja/negrita para listo/asignado #}
+                                {% set state_style = 'color: orange; font-weight: bold;' %} {# Orange/bold for ready/assigned #}
+                                {% set state_text = shipment.state.capitalize() %} {# Capitalize 'assigned' or 'ready' #}
                             {% elif shipment.state == 'done' %}
-                                {% set state_style = 'color: green; font-weight: bold;' %} {# Verde/negrita para completado #}
+                                {% set state_style = 'color: green; font-weight: bold;' %} {# Green/bold for completed #}
+                                {% set state_text = 'Done' %}
                             {% elif shipment.state == 'cancel' %}
-                                {% set state_style = 'color: red; text-decoration: line-through;' %} {# Rojo/tachado para cancelado #}
+                                {% set state_style = 'color: red; text-decoration: line-through;' %} {# Red/strikethrough for cancelled #}
+                                {% set state_text = 'Cancelled' %}
                             {% endif %}
-                            <span style="{{ state_style }}">{{ shipment.state }}</span>
+                            {# Display translated/formatted state text #}
+                            <span style="{{ state_style }}">{{ state_text }}</span>
                         </td>
-                        {# === INICIO: CELDA DE ACCIONES CORREGIDA === #}
+                        {# === START: CORRECTED ACTIONS CELL === Translated comment #}
                         <td class="actions-cell">
-                            {# === Lógica de Botones FINAL con RESERVAR STOCK === #}
+                            {# === FINAL Button Logic with RESERVE STOCK === Translated comment #}
 
-                            {# --- 1. Botón CONFIRMAR (si está en draft) --- #}
+                            {# --- 1. CONFIRM Button (if in draft) --- Translated comment #}
                             {% if shipment.state == 'draft' %}
                                 <form action="{{ url_for('books.confirm_shipment', picking_id=shipment.id) }}" method="POST" style="display: inline; margin-right: 5px;">
-                                    <button type="submit" class="btn btn-info" title="Confirma la transferencia para iniciar proceso">➡️ Confirmar</button>
+                                     <!-- Button text and title translated -->
+                                    <button type="submit" class="btn btn-info" title="Confirm the transfer to start the process">➡️ Confirm</button>
                                 </form>
 
-                            {# --- 2. Botón RESERVAR STOCK (si está confirmado/esperando) --- #}
+                            {# --- 2. RESERVE STOCK Button (if confirmed/waiting) --- Translated comment #}
                             {% elif shipment.state in ['confirmed', 'waiting'] %}
                                 <form action="{{ url_for('books.reserve_shipment', picking_id=shipment.id) }}" method="POST" style="display: inline; margin-right: 5px;">
-                                    <button type="submit" class="btn btn-warning" title="Intenta reservar el stock necesario para el envío">⏳ Reservar Stock</button>
+                                     <!-- Button text and title translated -->
+                                    <button type="submit" class="btn btn-warning" title="Attempt to reserve the necessary stock for the shipment">⏳ Reserve Stock</button>
                                 </form>
 
-                            {# --- 3. Botón VALIDAR/DETALLAR (si está asignado/listo) --- #}
+                            {# --- 3. VALIDATE/DETAILS Button (if assigned/ready) --- Translated comment #}
                             {% elif shipment.state in ['assigned', 'ready'] %}
                                 <form action="{{ url_for('books.validate_shipment', picking_id=shipment.id) }}" method="POST" style="display: inline;">
-                                    <button type="submit" class="btn btn-success" title="Abrir detalles para especificar cantidades y validar">✔️ Validar / Detallar</button>
+                                     <!-- Button text and title translated -->
+                                    <button type="submit" class="btn btn-success" title="Open details to specify quantities and validate">✔️ Validate / Details</button>
                                 </form>
 
-                            {# --- Texto si ya está hecho o cancelado --- #}
+                            {# --- Text if already done or cancelled --- Translated comment #}
                             {% elif shipment.state == 'done' %}
-                                <span style="color: green; font-weight: bold;">✅ Completado</span>
+                                 <!-- Text translated -->
+                                <span style="color: green; font-weight: bold;">✅ Completed</span>
                             {% elif shipment.state == 'cancel' %}
-                                <span style="color: red;">❌ Cancelado</span>
+                                 <!-- Text translated -->
+                                <span style="color: red;">❌ Cancelled</span>
                             {% endif %}
                         </td>
-                        {# === FIN: CELDA DE ACCIONES CORREGIDA === #}
+                        {# === END: CORRECTED ACTIONS CELL === Translated comment #}
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         {% elif not error_message %}
-             <p class="no-items">No hay envíos de lote creados que mostrar.</p>
+             <!-- Text translated -->
+             <p class="no-items">No created batch shipments to display.</p>
         {% endif %}
 
         <hr>
          <div class="form-actions" style="text-align: left;">
-             <a href="{{ url_for('main.index') }}" class="btn">Volver a Inicio</a>
+              <!-- Button text translated -->
+             <a href="{{ url_for('main.index') }}" class="btn">Back to Home</a>
          </div>
     </div>
 </body>

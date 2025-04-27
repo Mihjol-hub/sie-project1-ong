@@ -1,175 +1,219 @@
+# ong_app/odoo_inventory_utils.py
 import logging
 from odoorpc.error import RPCError
 
 def find_virtual_location_id(odoo_client, usage_type='inventory'):
-    # ... (Esta función auxiliar no cambia, la dejamos como estaba) ...
+    """
+    Finds the ID of a virtual location by its usage type ('inventory' or 'production').
+    Returns the ID of the first one found or None.
+
+    :param odoo_client: Connected odoorpc client instance.
+    :param usage_type: Usage type to search for ('inventory' or 'production').
+    :return: Location ID or None.
+    """
+    #
     StockLocation = odoo_client.env['stock.location']
     domain = [('usage', '=', usage_type)]
     location_ids = StockLocation.search(domain, limit=1)
     if location_ids:
-        logging.info(f"Ubicación virtual encontrada con uso '{usage_type}': ID {location_ids[0]}")
+        # Log message translated
+        logging.info(f"Virtual location found with usage '{usage_type}': ID {location_ids[0]}")
         return location_ids[0]
     else:
-        logging.warning(f"No se encontró una ubicación virtual con uso '{usage_type}'.")
+        # Log messages translated
+        logging.warning(f"Could not find a virtual location with usage '{usage_type}'.")
         if usage_type == 'inventory':
-            logging.info("Intentando buscar ubicación con uso 'production'...")
+            logging.info("Attempting to find location with usage 'production'...")
             return find_virtual_location_id(odoo_client, 'production')
         return None
 
 def add_initial_stock_via_receipt(odoo_client, product_id, quantity, target_location_id):
     """
-    Añade stock inicial simulando una Recepción (stock.picking).
-    Usa métodos públicos API para confirmar y validar.
+    Adds initial stock by simulating a Receipt (stock.picking).
+    Uses public API methods for confirmation and validation.
 
-    :param odoo_client: Instancia del cliente odoorpc conectado.
-    :param product_id: ID del product.product.
-    :param quantity: Cantidad a añadir (float).
-    :param target_location_id: ID de la stock.location destino (interna).
-    :return: True si tuvo éxito, False en caso contrario.
+    :param odoo_client: Connected odoorpc client instance.
+    :param product_id: ID of the product.product.
+    :param quantity: Quantity to add (float).
+    :param target_location_id: ID of the destination stock.location (internal).
+    :return: True if successful, False otherwise.
     """
-    logging.info(f"Intentando añadir stock inicial (via Picking Recepción) para producto ID {product_id} en ubicación ID {target_location_id}")
+    # Log message translated
+    logging.info(f"Attempting to add initial stock (via Receipt Picking) for product ID {product_id} in location ID {target_location_id}")
 
-    # --- !!! NECESITAS PONER EL ID REAL DE TU TIPO DE OPERACIÓN "RECEPCIONES" AQUÍ !!! ---
-    # --- Búscalo en Odoo: Inventario -> Configuración -> Tipos de Operación ---
+    # Picking type ID for Receipts (stock.picking.type)
+    # ID confirmed as 1
     RECEIPT_PICKING_TYPE_ID = 1 
     
-    picking_id = None  # Inicializar para logs de error
-    source_location_id = None # Inicializar para logs de error
+    picking_id = None  # Initialize for error logging
+    source_location_id = None # Initialize for error logging
 
     try:
         ProductProduct = odoo_client.env['product.product']
         
-        # 1. Obtener info del producto (UoM y Nombre)
+        # 1. Get product info (UoM and Name)
         product_info = ProductProduct.read(product_id, ['uom_id', 'display_name'])
         if not product_info or not product_info[0].get('uom_id') or not product_info[0].get('display_name'):
-            logging.error(f"No se pudo obtener información completa (UoM/Nombre) para el producto ID {product_id}")
+            # Log message translated
+            logging.error(f"Could not retrieve complete information (UoM/Name) for product ID {product_id}")
             return False
         product_uom_id = product_info[0]['uom_id'][0]
         product_display_name = product_info[0]['display_name']
-        logging.info(f"Producto ID {product_id} - Nombre: '{product_display_name}', UoM ID: {product_uom_id}")
+        # Log message translated
+        logging.info(f"Product ID {product_id} - Name: '{product_display_name}', UoM ID: {product_uom_id}")
 
-        # 2. Encontrar ubicación virtual de origen (como antes)
+        # 2. Find virtual source location (as before)
         source_location_id = find_virtual_location_id(odoo_client)
         if not source_location_id:
-            logging.error("¡Error Crítico! No se pudo encontrar una ubicación virtual de origen ('inventory' o 'production').")
+            # Log message translated
+            logging.error("Critical Error! Could not find a virtual source location ('inventory' or 'production').")
             return False
-        logging.info(f"Usando ubicación origen virtual ID: {source_location_id}")
+        # Log message translated
+        logging.info(f"Using virtual source location ID: {source_location_id}")
             
-        # 3. Preparar datos para crear el stock.picking (RECEPCIÓN)
-        # Nota: Las ubicaciones en el picking definen el flujo general,
-        #       y las líneas de move heredan esto si no se especifican diferente.
+        # 3. Prepare data to create the stock.picking (RECEIPT)
+        # Note: Locations in the picking define the general flow,
+        #       and move lines inherit this if not specified otherwise.
         picking_vals = {
-            'picking_type_id': RECEIPT_PICKING_TYPE_ID,   # <-- ¡Usa el ID correcto!
-            'location_id': source_location_id,            # Origen (Virtual)
-            'location_dest_id': target_location_id,       # Destino (Donde quieres el stock final)
-            'origin': f'Entrada Stock Inicial Auto (Flask): {product_display_name}', # Texto descriptivo
+            'picking_type_id': RECEIPT_PICKING_TYPE_ID,   # Picking type ID for Receipts (stock.picking.type)
+            'location_id': source_location_id,            # Source (Virtual)
+            'location_dest_id': target_location_id,       # Destination (Where you want the final stock)
+            # Descriptive text translated
+            'origin': f'Initial Stock Entry Auto (Flask): {product_display_name}', 
             'move_ids_without_package': [
-                (0, 0, { # Comando para crear una nueva línea de move
-                    'name': product_display_name,         # Descripción de la línea
-                    'product_id': product_id,           # El producto
-                    'product_uom_qty': quantity,        # La cantidad esperada
-                    'product_uom': product_uom_id,      # La unidad de medida
-                    'location_id': source_location_id,    # Origen de la línea (puede heredar)
-                    'location_dest_id': target_location_id # Destino de la línea (puede heredar)
+                # Command to create a new move line translated
+                (0, 0, { 
+                    # Line description translated
+                    'name': product_display_name,         
+                    # The product
+                    'product_id': product_id,           
+                    # Expected quantity
+                    'product_uom_qty': quantity,        
+                    # The unit of measure
+                    'product_uom': product_uom_id,      
+                    # Line source (can inherit)
+                    'location_id': source_location_id,    
+                    # Line destination (can inherit)
+                    'location_dest_id': target_location_id 
                 })
             ]
         }
-        logging.info(f"Valores para crear stock.picking (Recepción): {picking_vals}")
+        # Log message translated
+        logging.info(f"Values to create stock.picking (Receipt): {picking_vals}")
 
-        # 4. Crear el stock.picking
+        # 4. Create the stock.picking
         picking_id = odoo_client.execute_kw('stock.picking', 'create', [picking_vals])
         if not picking_id:
-             logging.error("La creación del stock.picking (Recepción) no devolvió ID.")
+             # Log message translated
+             logging.error("Stock picking creation (Receipt) did not return an ID.")
              return False
-        if isinstance(picking_id, list): # Manejar si devuelve lista
+        if isinstance(picking_id, list): # Handle if it returns a list
              if not picking_id:
-                 logging.error("La creación del stock.picking (Recepción) devolvió lista vacía.")
+                 # Log message translated
+                 logging.error("Stock picking creation (Receipt) returned an empty list.")
                  return False
              picking_id = picking_id[0]
-        logging.info(f"Stock Picking (Recepción) creado con ID: {picking_id}")
+        # Log message translated
+        logging.info(f"Stock Picking (Receipt) created with ID: {picking_id}")
 
-        # 5. Confirmar el Picking (acción pública)
-        logging.info(f"Llamando a action_confirm para picking ID {picking_id}...")
+        # 5. Confirm the Picking (public action)
+        # Log message translated
+        logging.info(f"Calling action_confirm for picking ID {picking_id}...")
         odoo_client.execute_kw('stock.picking', 'action_confirm', [[picking_id]])
-        logging.info(f"Picking ID {picking_id} confirmado.")
+        # Log message translated
+        logging.info(f"Picking ID {picking_id} confirmed.")
 
-        # 6. Reservar/Asignar el Picking (acción pública)
-        logging.info(f"Llamando a action_assign para picking ID {picking_id}...")
+        # 6. Reserve/Assign the Picking (public action)
+        # Log message translated
+        logging.info(f"Calling action_assign for picking ID {picking_id}...")
         odoo_client.execute_kw('stock.picking', 'action_assign', [[picking_id]])
-        logging.info(f"Intento de asignación para picking ID {picking_id} enviado.")
+        # Log message translated
+        logging.info(f"Assignment attempt sent for picking ID {picking_id}.")
         
-        # --- PASO EXTRA CRUCIAL PARA RECEPCIONES ---
-        # 7. Establecer la cantidad "Hecha" (qty_done) en las líneas de movimiento detalladas
-        logging.info(f"Estableciendo 'qty_done' = {quantity} para las líneas del picking ID {picking_id}")
+        # 7. Update the qty_done for the move line (stock.move.line)
+        logging.info(f"Setting 'qty_done' = {quantity} for the lines of picking ID {picking_id}")
         
-        # Leer las líneas de movimiento detalladas (stock.move.line) asociadas al picking
+        # Read the detailed move lines (stock.move.line) associated with the picking
         move_lines_data = odoo_client.execute_kw(
             'stock.move.line', 'search_read',
+            # Search for the line of our product
             [[('picking_id', '=', picking_id), ('product_id', '=', product_id)]],
-            {'fields': ['id'], 'limit': 1} # Buscamos la línea de nuestro producto
+            {'fields': ['id'], 'limit': 1} # need 'id'
         )
         
         if not move_lines_data:
-            logging.error(f"No se encontraron stock.move.line para el producto {product_id} en el picking {picking_id} después de asignar. ¡No se puede validar!")
-            # Podríamos intentar cancelar el picking aquí si quisiéramos...
+            # Log message translated
+            logging.error(f"Could not find stock.move.line for product {product_id} in picking {picking_id} after assigning. Cannot validate!")
+            # could try to cancel the picking here if desired...
             return False
             
         move_line_id = move_lines_data[0]['id']
-        logging.info(f"Línea de movimiento detallada encontrada (stock.move.line) ID: {move_line_id}. Actualizando qty_done...")
+        # Log message translated
+        logging.info(f"Detailed move line found (stock.move.line) ID: {move_line_id}. Updating qty_done...")
         
-        # Escribir la cantidad hecha en la línea encontrada
+        # Write the done quantity to the found line
         write_ok = odoo_client.execute_kw(
             'stock.move.line', 'write',
             [[move_line_id], {'qty_done': quantity}]
         )
         if not write_ok:
-             logging.error(f"Falló la escritura de qty_done en stock.move.line ID {move_line_id}.")
+            
+             logging.error(f"Failed to write qty_done on stock.move.line ID {move_line_id}.")
              return False
-        logging.info(f"qty_done actualizado en stock.move.line ID {move_line_id}.")
-        # --- FIN PASO EXTRA ---
+        # Log message translated
+        logging.info(f"qty_done updated on stock.move.line ID {move_line_id}.")
+        # --- END EXTRA STEP ---
 
-        # 8. Validar/Procesar el Picking (acción pública del botón "Validar")
-        logging.info(f"Intentando validar el picking ID {picking_id} llamando a button_validate...")
-        # button_validate puede devolver True o un diccionario de acción si requiere pasos extra (ej. backorder)
+        # 8. Validate/Process the Picking (public action of the "Validate" button)
+        # Log message translated
+        logging.info(f"Attempting to validate picking ID {picking_id} by calling button_validate...")
+        # button_validate can return True or an action dictionary if extra steps are needed (e.g., backorder)
         validation_result = odoo_client.execute_kw('stock.picking', 'button_validate', [[picking_id]])
-        logging.info(f"Resultado de button_validate para picking ID {picking_id}: {validation_result}")
+        # Log message translated
+        logging.info(f"Result of button_validate for picking ID {picking_id}: {validation_result}")
 
-        # Consideramos éxito si no hubo errores RPC y button_validate no devolvió explícitamente False
-        # (Un diccionario de acción como resultado a menudo significa éxito parcial o backorder, que está OK para nuestro propósito inicial de stock)
-        if validation_result is False: # Chequeo explícito por si devuelve False
-             logging.error(f"button_validate para picking ID {picking_id} devolvió False.")
+        # We consider it a success if there were no RPC errors and button_validate didn't explicitly return False
+        # (An action dictionary as a result often means partial success or backorder, which is OK for our initial stock purpose)
+        if validation_result is False: # Explicit check in case it returns False
+             # Log message translated
+             logging.error(f"button_validate for picking ID {picking_id} returned False.")
              return False
 
-        # Verificar estado final del picking (opcional, pero bueno)
+        # Verify final picking state (optional, but good)
         final_picking_state_data = odoo_client.execute_kw('stock.picking', 'read', [[picking_id]], {'fields': ['state']})
-        final_picking_state = final_picking_state_data[0]['state'] if final_picking_state_data else 'desconocido'
-        logging.info(f"Stock Picking ID {picking_id}: Estado final verificado como '{final_picking_state}'.")
+        final_picking_state = final_picking_state_data[0]['state'] if final_picking_state_data else 'unknown'
+        # Log message translated
+        logging.info(f"Stock Picking ID {picking_id}: Final state verified as '{final_picking_state}'.")
         
         if final_picking_state == 'done':
-            logging.info(f"¡Éxito! Stock añadido correctamente via Picking Recepción para producto {product_id}.")
+            # Log message translated
+            logging.info(f"Success! Stock added correctly via Receipt Picking for product {product_id}.")
             return True
         else:
-            # Si no está 'done' pero la validación no dio error directo, puede que esté esperando un backorder.
-            # Para el propósito de añadir stock inicial, esto podría ser suficiente, pero es bueno registrarlo.
-            logging.warning(f"El estado final del picking {picking_id} es '{final_picking_state}' (no 'done'). Stock podría estar disponible, pero revisar el picking en Odoo.")
-            # Decidimos si devolver True o False aquí. Si el objetivo es SOLO tener stock disponible, True podría estar bien.
-            # Si queremos que TODO el flujo se complete perfectamente, sería False. Seamos optimistas por ahora:
-            return True # Asumir éxito si la validación no falló explícitamente
+            # If not 'done' but validation didn't raise a direct error, it might be waiting for a backorder.
+            # For the purpose of adding initial stock, this might be sufficient, but it's good to log.
+            # Log message translated
+            logging.warning(f"Final state of picking {picking_id} is '{final_picking_state}' (not 'done'). Stock might be available, but review the picking in Odoo.")
+            # Decide whether to return True or False here. If the goal is ONLY available stock, True might be okay.
+            # If we want the entire flow to complete perfectly, it would be False. Let's be optimistic for now:
+            return True # Assume success if validation didn't explicitly fail
 
 
     except RPCError as e:
-        error_msg = f"Error RPC de Odoo"
+        # Log messages translated, error handling unchanged
+        error_msg = f"Odoo RPC Error"
         if picking_id: error_msg += f" (Picking ID {picking_id})"
-        error_msg += f" al intentar añadir stock via Recepción para producto {product_id}: {e}"
+        error_msg += f" while trying to add stock via Receipt for product {product_id}: {e}"
         logging.error(error_msg, exc_info=True)
-        # Podríamos intentar cancelar el picking aquí también
+        # We could try to cancel the picking here too
         # if picking_id:
         #    try: odoo_client.execute_kw('stock.picking', 'action_cancel', [[picking_id]])
         #    except: pass
         return False
     except Exception as e:
-        error_msg = f"Error inesperado"
+        # Log messages translated, error handling unchanged
+        error_msg = f"Unexpected error"
         if picking_id: error_msg += f" (Picking ID {picking_id})"
-        error_msg += f" al añadir stock via Recepción para producto {product_id}: {e}"
+        error_msg += f" while trying to add stock via Receipt for product {product_id}: {e}"
         logging.error(error_msg, exc_info=True)
         return False

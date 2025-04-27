@@ -31,6 +31,7 @@ def get_odoo_client():
     try:
         host = odoo_url.replace('http://', '').split(':')[0]
         port = int(odoo_url.split(':')[-1])
+        
         protocol = 'jsonrpc+ssl' if port == 443 else 'jsonrpc'
 
         logging.info(f"Paso 1: Intentando crear instancia odoorpc.ODOO(host='{host}', protocol='{protocol}', port={port}, timeout=60)")

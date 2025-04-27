@@ -1,19 +1,22 @@
-<!-- ong_app/templates/add_donor.html (CORREGIDO CON CLASES CSS) -->
+<!-- ong_app/templates/add_donor.html (Corrected with CSS Classes & Translated) -->
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en"> {# Language set to English #}
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Añadir Nuevo Donante</title>
+    <!-- Title translated -->
+    <title>Add New Donor</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="container">
-        <h1>Registrar Nuevo Donante/Voluntario</h1>
+        <!-- Header translated -->
+        <h1>Register New Donor/Volunteer</h1>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
+                     {# Message comes translated from Flask #}
                     <div class="flash-message flash-{{ category }}">{{ message }}</div>
                 {% endfor %}
             {% endif %}
@@ -21,32 +24,35 @@
 
         <form action="{{ url_for('donors.add_donor_submit') }}" method="post">
             
-            <!-- Campo Nombre -->
-            <div class="form-group"> {# <--- Grupo para Nombre #}
-                <label for="name">Nombre Completo:</label>
+            <!-- Name Field -->
+            <div class="form-group"> {# <--- Group for Name #}
+                 <!-- Label translated -->
+                <label for="name">Full Name:</label>
                 <input type="text" id="name" name="name" required>
             </div>
 
-            <!-- Campo Email -->
-            <div class="form-group"> {# <--- Grupo para Email #}
+            <!-- Email Field -->
+            <div class="form-group"> {# <--- Group for Email #}
                 <label for="email">Email:</label>
                 <input type="email" id="email" name="email"> 
             </div>
 
-            <!-- Campo Teléfono -->
-            <div class="form-group"> {# <--- Grupo para Teléfono #}
-                <label for="phone">Teléfono:</label>
+            <!-- Phone Field -->
+            <div class="form-group"> {# <--- Group for Phone #}
+                 <!-- Label translated -->
+                <label for="phone">Phone:</label>
                 <input type="tel" id="phone" name="phone">
             </div>
             
-            <!-- Botones de Acción del Formulario -->
-            <div class="form-actions"> {# <--- Contenedor para botones #}
-                <button type="submit" class="btn btn-primary">Añadir Donante</button> {# <-- Botón Principal #}
-                <a href="{{ url_for('main.index') }}" class="btn">Volver a Inicio</a> {# <-- Botón secundario #}
+            <!-- Form Action Buttons -->
+            <div class="form-actions"> {# <--- Container for buttons #}
+                 <!-- Button texts translated -->
+                <button type="submit" class="btn btn-primary">Add Donor</button> {# <-- Primary Button #}
+                <a href="{{ url_for('main.index') }}" class="btn">Back to Home</a> {# <-- Secondary button #}
             </div>
         </form>
         
-        {# Eliminamos el <hr> y <p> extra #}
+        {# Extra <hr> and <p> removed #}
 
     </div>
 </body>

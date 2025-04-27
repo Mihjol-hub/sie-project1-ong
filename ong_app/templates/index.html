@@ -1,85 +1,102 @@
-<!-- ong_app/templates/index.html (CORREGIDO) -->
+<!-- ong_app/templates/index.html (CORRECTED & TRANSLATED) -->
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en"> {# Language set to English #}
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ page_title }} - Panel Principal</title> 
+    <!-- Title structure kept, suffix translated -->
+    <title>{{ page_title }} - Main Dashboard</title> 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="container">
         <h1>{{ page_title }}</h1>
-        <p>Aplicación de Gestión de Donaciones (Flask + Odoo) - Propuesta 1 (Adaptada).</p>
+         <!-- Description translated -->
+        <p>Donation Management Application (Flask + Odoo) - Proposal 1 (Adapted).</p>
 
         <div class="dashboard-section" style="text-align: center; margin-bottom: 30px; padding: 20px; background-color:#f0f0f0; border-radius:5px;">
-            <h2>Resumen Rápido</h2>
+             <!-- Header translated -->
+            <h2>Quick Summary</h2>
             {% if count_fetch_error %}
-                <p class="error-msg">Error al cargar resumen: {{ count_fetch_error }}</p>
+                <!-- Error message translated -->
+                <p class="error-msg">Error loading summary: {{ count_fetch_error }}</p>
             {% else %}
-                {# Usamos estilos inline simples para los cuadros, puedes mejorarlo en CSS si quieres #}
+                {# Simple inline styles for boxes kept, can improve in CSS #}
                 <span style="display: inline-block; margin: 10px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #fff;">
                     <a href="{{ url_for('books.review_books') }}" style="text-decoration:none; color: inherit;">
-                        <strong style="font-size: 1.8em; display:block;">{{ book_counts.pending }}</strong> Libros Pendientes
+                         <!-- Text translated -->
+                        <strong style="font-size: 1.8em; display:block;">{{ book_counts.pending }}</strong> Pending Books
                     </a>
                 </span>
                 <span style="display: inline-block; margin: 10px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #fff;">
                     <a href="{{ url_for('books.approved_books') }}" style="text-decoration:none; color: inherit;">
-                         <strong style="font-size: 1.8em; display:block;">{{ book_counts.approved }}</strong> Libros Aprobados
+                         <!-- Text translated -->
+                         <strong style="font-size: 1.8em; display:block;">{{ book_counts.approved }}</strong> Approved Books
                     </a>
                 </span>
                 <span style="display: inline-block; margin: 10px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #fff;">
                     <a href="{{ url_for('books.rejected_books') }}" style="text-decoration:none; color: inherit;">
-                         <strong style="font-size: 1.8em; display:block;">{{ book_counts.rejected }}</strong> Libros Rechazados
+                          <!-- Text translated -->
+                         <strong style="font-size: 1.8em; display:block;">{{ book_counts.rejected }}</strong> Rejected Books
                      </a>
                 </span>
             {% endif %}
         </div>
 
         <div class="info-section">
-            <h2>Información del Sistema</h2>
+             <!-- Header translated -->
+            <h2>System Information</h2>
             <ul>
-                 {% set status_class = 'status-connected' if 'Conectado' in odoo_connection_status else 'status-disconnected' %}
-                 <li><b>Estado conexión Odoo:</b> <span class="{{ status_class }}">{{ odoo_connection_status }}</span></li>
-                 <li><a href="{{ url_for('main.odoo_version_test') }}">Ver versión Odoo (API)</a></li>
-                 {# Quitamos el /api/hello que no es relevante para el usuario final #}
-                 {# <li><a href="{{ url_for('main.api_hello') }}">Probar endpoint API simple Flask</a></li> #}
+                 {# Logic to set CSS class kept, label translated #}
+                 {% set status_class = 'status-connected' if 'Connected' in odoo_connection_status or 'Conectado' in odoo_connection_status else 'status-disconnected' %}
+                 <li><b>Odoo Connection Status:</b> <span class="{{ status_class }}">{{ odoo_connection_status }}</span></li>
+                 <!-- Link text translated -->
+                 <li><a href="{{ url_for('main.odoo_version_test') }}">View Odoo Version (API)</a></li>
+                 {# Removed /api/hello as it's not relevant for end-user #}
             </ul>
         </div>
         
         <hr>
 
         <div class="books-section">
-            <h2>Gestión de Libros Donados</h2>
+            <!-- Header translated -->
+            <h2>Donated Book Management</h2>
             <ul>
-                <li><a href="{{ url_for('books.add_book_form') }}">➡️ Registrar Nuevo Libro Donado</a></li>
-                <li><a href="{{ url_for('books.review_books') }}">🔍 Revisar Libros Pendientes</a></li>
-                <li><a href="{{ url_for('books.approved_books') }}">✅ Ver Libros Aprobados</a></li>
-                <li><a href="{{ url_for('books.shipping_management') }}">📦 Gestión de Envíos</a></li>
-                <li><a href="{{ url_for('books.rejected_books') }}">❌ Ver Libros Rechazados</a></li>
-                <li><a href="{{ url_for('books.list_books') }}">📚 Ver TODOS los Libros Registrados</a></li>
+                 <!-- Link texts translated -->
+                <li><a href="{{ url_for('books.add_book_form') }}">➡️ Register New Donated Book</a></li>
+                <li><a href="{{ url_for('books.review_books') }}">🔍 Review Pending Books</a></li>
+                <li><a href="{{ url_for('books.approved_books') }}">✅ View Approved Books</a></li>
+                <li><a href="{{ url_for('books.shipping_management') }}">📦 Shipment Management</a></li>
+                <li><a href="{{ url_for('books.rejected_books') }}">❌ View Rejected Books</a></li>
+                <li><a href="{{ url_for('books.list_books') }}">📚 View ALL Registered Books</a></li>
             </ul>
         </div>
         
         <hr>
 
         <div class="donors-section">
-            <h2>Gestión de Donantes / Voluntarios</h2>
+             <!-- Header translated -->
+            <h2>Donor / Volunteer Management</h2>
             <ul>
-                 <li><a href="{{ url_for('donors.add_donor_form') }}">➕ Registrar Nuevo Donante/Voluntario</a></li>
-                 <li><a href="{{ url_for('donors.list_donors') }}">👥 Ver Donantes Registrados</a></li>
-                 {# Añadir aquí enlaces si implementas Editar/Borrar Donantes #}
+                 <!-- Link texts translated -->
+                 <li><a href="{{ url_for('donors.add_donor_form') }}">➕ Register New Donor/Volunteer</a></li>
+                 <li><a href="{{ url_for('donors.list_donors') }}">👥 View Registered Donors</a></li>
+                 {# Add links here if you implement Edit/Delete Donors #}
             </ul>
         </div>
         <hr> 
 
         <div class="donations-monetary-section"> 
-            <h2>Gestión de Donaciones Monetarias</h2>
+             <!-- Header translated -->
+            <h2>Monetary Donation Management</h2>
             <ul>
-                 <li><a href="{{ url_for('donations.add_monetary_donation_form') }}">💰 Registrar Nueva Donación Monetaria</a></li>
-                 <li><a href="{{ url_for('donations.list_monetary_donations') }}">📊 Ver Donaciones Monetarias Registradas</a></li>
+                 <!-- Link texts translated -->
+                 <li><a href="{{ url_for('donations.add_monetary_donation_form') }}">💰 Register New Monetary Donation</a></li>
+                 <li><a href="{{ url_for('donations.list_monetary_donations') }}">📊 View Registered Monetary Donations</a></li>
     
             </ul>
         </div>
         
-
+    </div>
+</body>
+</html>

@@ -1,72 +1,85 @@
-<!-- ong_app/templates/add_book.html (CORREGIDO CON CLASES CSS) -->
+<!-- ong_app/templates/add_book.html (Corrected with CSS Classes) -->
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en"> {# Language changed to English #}
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Añadir Libro Donado</title>
+    <!-- Title translated -->
+    <title>Add Donated Book</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="container">
-        <h1>Registrar Nuevo Libro Donado</h1>
+        <!-- Header translated -->
+        <h1>Register New Donated Book</h1>
 
-        <!-- Mostrar mensajes flash -->
+        <!-- Show flash messages (Structure unchanged, CSS classes kept) -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
+                    {# Message variable itself comes translated from Python flash() call #}
                     <div class="flash-message flash-{{ category }}">{{ message }}</div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
 
-        <!-- Mostrar mensaje de error específico (si lo hay) -->
+        <!-- Show specific error message (if any) (Structure unchanged) -->
         {% if error_message %}
-            <p class="error-msg">Error al cargar datos: {{ error_message }}</p>
+            <!-- Error prefix translated -->
+            <p class="error-msg">Error loading data: {{ error_message }}</p>
         {% endif %}
 
         <form action="{{ url_for('books.add_book_submit') }}" method="post">
 
-            <!-- Selección de Donante -->
-            <div class="form-group">  {# <--- Grupo para Donante #}
-                <label for="donor_id">Donante (Opcional):</label>
+            <!-- Donor Selection -->
+            <div class="form-group"> {# <--- Group for Donor #}
+                <!-- Label translated -->
+                <label for="donor_id">Donor (Optional):</label>
                 <select id="donor_id" name="donor_id">
-                    <option value="">-- Seleccionar Donante Existente --</option>
+                    <!-- Default option translated -->
+                    <option value="">-- Select Existing Donor --</option>
                     {% if donors %}
                         {% for donor in donors %}
                         <option value="{{ donor.id }}">{{ donor.name }} (ID: {{ donor.id }})</option>
                         {% endfor %}
                     {% else %}
-                        <option value="" disabled>No hay donantes.</option>
+                         <!-- Disabled option text translated -->
+                        <option value="" disabled>No donors available.</option>
                     {% endif %}
                 </select>
-                <small style="display: block; margin-top: 5px;">Si el donante no está, <a href="{{ url_for('donors.add_donor_form') }}" target="_blank">añádelo aquí</a> primero.</small>
+                <!-- Small text translated -->
+                <small style="display: block; margin-top: 5px;">If the donor isn't listed, <a href="{{ url_for('donors.add_donor_form') }}" target="_blank">add them here</a> first.</small>
             </div>
 
-            <hr> {# Separador visual opcional #}
+            <hr> {# Optional visual separator #}
 
-            <!-- Campos del Libro -->
-            <div class="form-group"> {# <--- Grupo para Título #}
-                <label for="title">Título:</label>
+            <!-- Book Fields -->
+            <div class="form-group"> {# <--- Group for Title #}
+                 <!-- Label translated -->
+                <label for="title">Title:</label>
                 <input type="text" id="title" name="title" required>
             </div>
-            <div class="form-group"> {# <--- Grupo para Autor #}
-                <label for="author">Autor:</label>
+            <div class="form-group"> {# <--- Group for Author #}
+                 <!-- Label translated -->
+                <label for="author">Author:</label>
                 <input type="text" id="author" name="author">
             </div>
-            <div class="form-group"> {# <--- Grupo para ISBN #}
-                <label for="isbn">ISBN (Referencia Interna):</label>
+            <div class="form-group"> {# <--- Group for ISBN #}
+                 <!-- Label translated -->
+                <label for="isbn">ISBN (Internal Reference):</label>
                 <input type="text" id="isbn" name="isbn">
             </div>
 
-            <!-- Botones de Acción del Formulario -->
-            <div class="form-actions"> {# <--- Contenedor para botones #}
-                <button type="submit" class="btn btn-primary">Añadir Libro</button> {# <-- Botón Principal #}
-                <a href="{{ url_for('main.index') }}" class="btn">Volver a Inicio</a> {# <-- Botón secundario (estilo link) #}
+            <!-- Form Action Buttons -->
+            <div class="form-actions"> {# <--- Container for buttons #}
+                 <!-- Button text translated -->
+                <button type="submit" class="btn btn-primary">Add Book</button> {# <-- Primary Button #}
+                 <!-- Button text translated -->
+                <a href="{{ url_for('main.index') }}" class="btn">Back to Home</a> {# <-- Secondary button (link style) #}
             </div>
         </form>
         
-        {# Eliminamos el <hr> y <p> extra porque 'Volver a Inicio' ya está en form-actions #}
+        {# Removed extra <hr> and <p> because 'Back to Home' is already in form-actions #}
         
     </div>
 </body>

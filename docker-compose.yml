@@ -1,7 +1,7 @@
 # docker-compose.yml
-services:  # <--- CLAVE: Define el bloque de servicios
+services:  # <-- KEY: Defines the services block Translated comment
 
-  flask_app: # <-- Servicio 1, indentado bajo services
+  flask_app: # <-- Service 1, indented under services Translated comment
     build: .
     container_name: my_flask_ong_app
     ports:
@@ -9,12 +9,15 @@ services:  # <--- CLAVE: Define el bloque de servicios
     volumes:
       - ./ong_app:/app/ong_app
       - ./run.py:/app/run.py
-      # - ./requirements.txt:/app/requirements.txt # Podemos comentar esto si no cambia
+      # - ./requirements.txt:/app/requirements.txt # We can comment this if it doesn't change Translated comment
     environment:
-      - FLASK_APP=ong_app:create_app # Le dice a Flask dónde encontrar la factory
-      - FLASK_ENV=development        # Activa modo dev (debug y reloader)
-      - SECRET_KEY=mi_super_secret_del_compose_123! # Usa la variable de aquí
-      # Variables de Odoo
+       # Tells Flask where to find the factory Translated comment
+      - FLASK_APP=ong_app:create_app 
+       # Activates dev mode (debug and reloader) Translated comment
+      - FLASK_ENV=development        
+       # Use variable from here Translated comment - Note: You might want to change the secret key itself for production
+      - SECRET_KEY=my_super_secret_from_compose_123! 
+      # Odoo Variables Translated comment
       - ODOO_URL=http://odoo:8069
       - ODOO_DB=ong_db
       - ODOO_USER=miguel.romero.3@etu.unige.ch
@@ -22,9 +25,10 @@ services:  # <--- CLAVE: Define el bloque de servicios
     depends_on:
       - odoo
     networks:
-      - ong_network # Lo añadimos a la red personalizada
+       # Add it to the custom network Translated comment
+      - ong_network 
 
-  odoo: # <-- Servicio 2, indentado bajo services (mismo nivel que flask_app)
+  odoo: # <-- Service 2, indented under services (same level as flask_app) Translated comment
     image: odoo:16.0
     container_name: odoo_service
     depends_on:
@@ -32,34 +36,42 @@ services:  # <--- CLAVE: Define el bloque de servicios
     ports:
       - "8069:8069"
     volumes:
-      - odoo_data:/var/lib/odoo # Volumen nombrado
+       # Named volume Translated comment
+      - odoo_data:/var/lib/odoo 
     environment:
       - HOST=odoo_db
       - PORT=5432
       - USER=odoo
-      - PASSWORD=odoo_password # Contraseña de conexión BD Odoo (definida abajo)
-      # - ODOO_MASTER_PASSWORD=3hbh-nbcc-ht99 # Tu master password guardada (descomentar si necesitas crear BDs de nuevo)
+       # Odoo DB connection password (defined below) Translated comment
+      - PASSWORD=odoo_password 
+       # Your saved master password (uncomment if you need to create DBs again) Translated comment
+      # - ODOO_MASTER_PASSWORD=3hbh-nbcc-ht99 
     networks:
-      - ong_network # Lo añadimos a la red personalizada
+      # Add it to the custom network Translated comment
+      - ong_network 
 
-  odoo_db: # <-- Servicio 3, indentado bajo services (mismo nivel que flask_app)
+  odoo_db: # <-- Service 3, indented under services (same level as flask_app) Translated comment
     image: postgres:15
     container_name: odoo_postgres_db
     environment:
       - POSTGRES_DB=postgres
-      - POSTGRES_PASSWORD=odoo_password # ¡¡IMPORTANTE!! Misma contraseña que Odoo usa para conectar
-      - POSTGRES_USER=odoo            # ¡¡IMPORTANTE!! Mismo usuario que Odoo usa para conectar
+       # IMPORTANT!! Same password Odoo uses to connect Translated comment
+      - POSTGRES_PASSWORD=odoo_password 
+       # IMPORTANT!! Same user Odoo uses to connect Translated comment
+      - POSTGRES_USER=odoo            
     volumes:
-      - postgres_data:/var/lib/postgresql/data # Volumen nombrado
+      # Named volume Translated comment
+      - postgres_data:/var/lib/postgresql/data 
     networks:
-      - ong_network # Lo añadimos a la red personalizada
+      # Add it to the custom network Translated comment
+      - ong_network 
 
-# --- Volúmenes Nombrados (Nivel Superior) ---
-volumes: # <-- Al mismo nivel que 'services'
+# --- Named Volumes (Top Level) --- Translated comment
+volumes: # <-- Same level as 'services' Translated comment
   odoo_data:
   postgres_data:
 
-# --- Red Personalizada (Nivel Superior) ---
-networks: # <-- Al mismo nivel que 'services'
+# --- Custom Network (Top Level) --- Translated comment
+networks: # <-- Same level as 'services' Translated comment
   ong_network:
     driver: bridge

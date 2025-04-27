@@ -1,36 +1,41 @@
-<!-- ong_app/templates/list_donors.html (Ajustado) -->
+<!-- ong_app/templates/list_donors.html (Adjusted & Translated) -->
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en"> {# Language set to English #}
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Listado de Donantes/Contactos</title>
+     <!-- Title translated -->
+    <title>List of Donors/Contacts</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="container">
-        <h1>Listado de Donantes/Contactos</h1>
+        <!-- Header translated -->
+        <h1>List of Donors/Contacts</h1>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
+                     {# Message comes translated from Flask #}
                     <div class="flash-message flash-{{ category }}">{{ message }}</div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
 
         {% if error_message %}
-            <p class="error-msg">Error al cargar la lista: {{ error_message }}</p>
+            <!-- Error prefix translated -->
+            <p class="error-msg">Error loading list: {{ error_message }}</p>
         {% endif %}
 
         {% if donors %}
             <table>
                 <thead>
                     <tr>
-                        <th>ID Odoo</th>
-                        <th>Nombre</th>
+                         <!-- Table headers translated -->
+                        <th>Odoo ID</th>
+                        <th>Name</th>
                         <th>Email</th>
-                        <th>Teléfono</th>
+                        <th>Phone</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -45,14 +50,16 @@
                 </tbody>
             </table>
         {% elif not error_message %}
-             <p class="no-items">No hay donantes/contactos para mostrar.</p>
+             <!-- Text translated -->
+             <p class="no-items">No donors/contacts to display.</p>
         {% endif %}
 
         <hr>
-         {# Usamos div.form-actions para mantener el estilo #}
+         {# Use div.form-actions to maintain style Translated comment #}
          <div class="form-actions" style="text-align: left;">
-            <a href="{{ url_for('donors.add_donor_form') }}" class="btn btn-primary">Registrar Nuevo Donante</a> {# <--- Clase btn y btn-primary #}
-            <a href="{{ url_for('main.index') }}" class="btn">Volver a Inicio</a> {# <--- Clase btn añadida #}
+             <!-- Button texts translated -->
+            <a href="{{ url_for('donors.add_donor_form') }}" class="btn btn-primary">Register New Donor</a> {# <--- btn and btn-primary class #}
+            <a href="{{ url_for('main.index') }}" class="btn">Back to Home</a> {# <--- Added btn class #}
          </div>
     </div>
 </body>

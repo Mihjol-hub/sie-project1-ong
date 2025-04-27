@@ -1,95 +1,116 @@
 # ong_app/routes_donors.py
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from .odoo_connector import get_odoo_client # ¡Necesitamos importar esto ahora!
+# We need to import this now! Comment translated
+from .odoo_connector import get_odoo_client 
 import logging
-import odoorpc # Importar para las excepciones RPC
+# Import for RPC exceptions Comment translated
+import odoorpc 
 
 donors_bp = Blueprint('donors', __name__)
 
-# Ruta para MOSTRAR el formulario de añadir donante
+# Route to DISPLAY the add donor form Comment translated
 @donors_bp.route('/add_donor', methods=['GET'])
 def add_donor_form():
-    logging.info("[donors_bp] Mostrando formulario para añadir donante.")
-    return render_template('add_donor.html') # Renderiza la plantilla vacía
+    # Log message translated
+    logging.info("[donors_bp] Displaying form to add donor.")
+    # Renders the empty template Comment translated
+    return render_template('add_donor.html') 
 
 
-# --- RUTA PARA PROCESAR el formulario de añadir donante ---
-
+# --- ROUTE TO PROCESS the add donor form --- Comment translated
 @donors_bp.route('/add_donor', methods=['POST'])
 def add_donor_submit():
-    # 1. Obtener datos del formulario
+    # 1. Get form data Comment translated
     name = request.form.get('name')
     email = request.form.get('email')
     phone = request.form.get('phone')
 
-    # 2. Validación básica (nombre obligatorio)
+    # 2. Basic validation (name required) Comment translated
     if not name:
-        flash('El Nombre Completo es obligatorio.', 'error')
-        return redirect(url_for('donors.add_donor_form')) # Redirigir al GET
+        # Flash message translated
+        flash('Full Name is mandatory.', 'error')
+        # Redirect to GET Comment translated
+        return redirect(url_for('donors.add_donor_form')) 
 
-    logging.info(f"[donors_bp] Datos recibidos para nuevo donante: Name='{name}', Email='{email}', Phone='{phone}'")
+    # Log message translated
+    logging.info(f"[donors_bp] Data received for new donor: Name='{name}', Email='{email}', Phone='{phone}'")
 
-    # 3. Obtener conexión Odoo
+    # 3. Get Odoo connection Comment translated
     client = get_odoo_client()
     if not client:
-        flash('Error de conexión con Odoo. No se pudo añadir el donante.', 'error')
+        # Flash message translated
+        flash('Odoo connection error. Could not add donor.', 'error')
         return redirect(url_for('donors.add_donor_form'))
 
-    # 4. Intentar crear el contacto (res.partner) en Odoo
+    # 4. Try to create the contact (res.partner) in Odoo Comment translated
     try:
-        # Modelo para contactos en Odoo: res.partner
+        # Model for contacts in Odoo: res.partner Comment translated
 
-        # Búsqueda simple para evitar duplicados por email si se proporcionó
+        # Simple search to avoid duplicates by email if provided Comment translated
         existing_partner_ids = []
         if email:
             search_criteria = [('email', '=', email)]
-            logging.info(f"[donors_bp] Buscando partner existente por email: {email}")
+             # Log message translated
+            logging.info(f"[donors_bp] Searching for existing partner by email: {email}")
             existing_partner_ids = client.env['res.partner'].search(search_criteria)
-            logging.info(f"[donors_bp] IDs encontrados: {existing_partner_ids}")
+             # Log message translated
+            logging.info(f"[donors_bp] IDs found: {existing_partner_ids}")
 
         if existing_partner_ids:
-            partner_id = existing_partner_ids[0] # Tomamos el primero encontrado
-            logging.warning(f"[donors_bp] Partner ya existe con email {email}. ID: {partner_id}. No se crea nuevo.")
-            flash(f'Ya existe un contacto con el email {email} (ID: {partner_id}). No se añadió de nuevo.', 'warning')
-            # Podríamos redirigir a una página de "ver donante" en el futuro
+            # Take the first one found Comment translated
+            partner_id = existing_partner_ids[0] 
+             # Log message translated
+            logging.warning(f"[donors_bp] Partner already exists with email {email}. ID: {partner_id}. Not creating new one.")
+             # Flash message translated
+            flash(f'A contact with email {email} already exists (ID: {partner_id}). Not added again.', 'warning')
+            # We could redirect to a "view donor" page in the future Comment translated
             return redirect(url_for('donors.add_donor_form'))
 
-        # Si no existe, crear uno nuevo
-        logging.info("[donors_bp] Partner no encontrado por email, creando nuevo...")
+        # If it doesn't exist, create a new one Comment translated
+         # Log message translated
+        logging.info("[donors_bp] Partner not found by email, creating new...")
         partner_data = {
             'name': name,
-            'email': email if email else False, # Odoo espera False si está vacío, no ''
+             # Odoo expects False if empty, not '' Comment translated
+            'email': email if email else False, 
             'phone': phone if phone else False,
-            # Cómo marcarlo como Donante/Voluntario:
-            # Opción 1 (Simple): Usar notas internas
-            'comment': 'Contacto registrado desde App Flask ONG',
-            # Opción 2 (Mejor a futuro): Añadir Etiquetas/Categorías.
-            # Requeriría buscar o crear las IDs de las categorías 'Donante'/'Voluntario'
+            # How to mark as Donor/Volunteer: Comment translated
+            # Option 1 (Simple): Use internal notes Comment translated
+            # Comment translated
+            'comment': 'Contact registered from ONG Flask App', 
+            # Option 2 (Better for future): Add Tags/Categories. Comment translated
+            # Would require finding or creating IDs for 'Donor'/'Volunteer' categories Comment translated
             # 'category_id': [(6, 0, [id_categoria_donante])],
-            # Opción 3 (Más avanzado): Campos personalizados (ej. x_is_donor = True)
+            # Option 3 (More advanced): Custom fields (e.g., x_is_donor = True) Comment translated
 
-            # Otros campos útiles para contactos:
-            'company_type': 'person', # Indicar que es una persona, no una empresa
-            # 'is_company': False,   # Otra forma de indicarlo en algunas versiones/vistas
+            # Other useful fields for contacts: Comment translated
+             # Indicate it's a person, not a company Comment translated
+            'company_type': 'person', 
+            # 'is_company': False,   # Another way to indicate it in some versions/views Comment translated
         }
 
         new_partner_id = client.env['res.partner'].create(partner_data)
-        logging.info(f"[donors_bp] ¡Partner creado con éxito en Odoo! ID: {new_partner_id}")
-        flash(f'Donante/Voluntario "{name}" añadido con éxito a Odoo (ID: {new_partner_id}).', 'success')
+        # Log message translated
+        logging.info(f"[donors_bp] Partner created successfully in Odoo! ID: {new_partner_id}")
+         # Flash message translated
+        flash(f'Donor/Volunteer "{name}" added successfully to Odoo (ID: {new_partner_id}).', 'success')
 
     except odoorpc.error.RPCError as e:
-        logging.error(f"[donors_bp] Error RPC al crear partner: {e}", exc_info=True)
-        flash(f'Error RPC al comunicar con Odoo: {e}', 'error')
+         # Log message translated
+        logging.error(f"[donors_bp] RPC Error creating partner: {e}", exc_info=True)
+         # Flash message translated
+        flash(f'RPC Error communicating with Odoo: {e}', 'error')
     except Exception as e:
-        logging.error(f"[donors_bp] Error inesperado al crear partner: {e}", exc_info=True)
-        flash(f'Error inesperado en el servidor: {e}', 'error')
+         # Log message translated
+        logging.error(f"[donors_bp] Unexpected error creating partner: {e}", exc_info=True)
+         # Flash message translated
+        flash(f'Unexpected server error: {e}', 'error')
 
-    # Redirigir de vuelta al formulario para ver el mensaje flash
+    # Redirect back to the form to see the flash message Comment translated
     return redirect(url_for('donors.add_donor_form'))
 
 
-# --- NUEVA RUTA PARA LISTAR DONANTES ---
-
+# --- NEW ROUTE TO LIST DONORS --- Comment translated
 @donors_bp.route('/list_donors')
 def list_donors():
     donors = []
@@ -97,35 +118,46 @@ def list_donors():
 
     client = get_odoo_client()
     if not client:
-        flash('Error de conexión con Odoo. No se pueden listar los donantes.', 'error')
-        error_message = "Error de conexión con Odoo."
-        # Renderizamos igual para mostrar el error en la plantilla de lista
+        # Flash message translated
+        flash('Odoo connection error. Cannot list donors.', 'error')
+         # Error message translated
+        error_message = "Odoo connection error."
+        # Render anyway to show error in list template Comment translated
         return render_template('list_donors.html', donors=donors, error_message=error_message)
 
     try:
-        logging.info("[donors_bp] Intentando buscar y leer donantes (partners) desde Odoo...")
-        # Buscamos partners que sean personas
-        # Leemos los campos id, name, email, phone. Limitamos por si acaso.
-        # Nota: Podríamos ordenar desde la búsqueda con 'order="name asc"'
+        # Log message translated
+        logging.info("[donors_bp] Attempting to search and read donors (partners) from Odoo...")
+        # Search for partners who are individuals Comment translated
+        # Read id, name, email, phone fields. Limit just in case. Comment translated
+        # Note: We could sort from the search with 'order="name asc"' Comment translated
         partner_ids = client.env['res.partner'].search([('company_type', '=', 'person')], limit=100, order="name asc")
-        logging.info(f"[donors_bp] IDs de partners encontrados: {partner_ids}")
+        # Log message translated
+        logging.info(f"[donors_bp] Partner IDs found: {partner_ids}")
 
         if partner_ids:
             donors = client.env['res.partner'].read(partner_ids, ['id', 'name', 'email', 'phone'])
-            logging.info(f"[donors_bp] Datos de partners leídos: {donors}")
-            # La búsqueda ya los ordenó por nombre si se especificó 'order'
+             # Log message translated
+            logging.info(f"[donors_bp] Partner data read: {donors}")
+            # Search already sorted them by name if 'order' was specified Comment translated
         else:
-            logging.info("[donors_bp] No se encontraron partners tipo 'persona'.")
-            flash('No se encontraron donantes/contactos registrados.', 'info')
+            # Log message translated
+            logging.info("[donors_bp] No partners of type 'person' found.")
+            # Flash message translated
+            flash('No donors/contacts registered found.', 'info')
 
     except odoorpc.error.RPCError as e:
-        logging.error(f"[donors_bp] Error RPC al listar partners: {e}", exc_info=True)
-        error_message = f"Error RPC al comunicar con Odoo: {e}"
+         # Log message translated
+        logging.error(f"[donors_bp] RPC Error listing partners: {e}", exc_info=True)
+         # Error message translated
+        error_message = f"RPC Error communicating with Odoo: {e}"
         flash(error_message, 'error')
     except Exception as e:
-        logging.error(f"[donors_bp] Error inesperado al listar partners: {e}", exc_info=True)
-        error_message = f"Error inesperado en el servidor: {e}"
+         # Log message translated
+        logging.error(f"[donors_bp] Unexpected error listing partners: {e}", exc_info=True)
+         # Error message translated
+        error_message = f"Unexpected server error: {e}"
         flash(error_message, 'error')
 
-    # Renderizar plantilla pasando la lista de donantes y posible error
+    # Render template passing donor list and possible error Comment translated
     return render_template('list_donors.html', donors=donors, error_message=error_message)

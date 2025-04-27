@@ -1,74 +1,92 @@
+<!-- ong_app/templates/add_monetary_donation.html (Adjusted & Translated) -->
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en"> {# Language set to English #}
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Título Más Específico -->
-    <title>Registrar Donación Monetaria - ONG</title>
+    <!-- More Specific Title translated -->
+    <title>Register Monetary Donation - NGO</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="container">
-        <!-- Usamos H1 consistente -->
-        <h1>Registrar Nueva Donación Monetaria</h1>
+        <!-- Consistent H1 translated -->
+        <h1>Register New Monetary Donation</h1>
 
-        <!-- Mensajes Flash (usando la misma estructura que en add_book) -->
+        <!-- Flash Messages (using same structure as in add_book) -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
-                 <div class="flash-messages"> {# Contenedor general por si quieres estilizarlo #}
+                 {# General container if you want to style it #}
+                 <div class="flash-messages"> 
                     {% for category, message in messages %}
+                         {# Message comes translated from Flask #}
                         <div class="flash-message flash-{{ category }}">{{ message }}</div>
                     {% endfor %}
                  </div>
             {% endif %}
         {% endwith %}
         {% if error_message %}
-            <p class="error-msg">Error: {{ error_message }}</p> {# Mensaje de error específico más claro #}
+             <!-- Error prefix translated (clearer specific error msg) -->
+            <p class="error-msg">Error: {{ error_message }}</p> 
         {% endif %}
 
-        <!-- Formulario - Aplicamos las clases CSS -->
+        <!-- Form - Applying CSS classes -->
         <form action="{{ url_for('donations.add_monetary_donation_submit') }}" method="POST">
 
-            <!-- Campo Donante -->
-            <div class="form-group">  {# Usamos form-group #}
-                <label for="donor_id">Donante:</label>
-                <select name="donor_id" id="donor_id" required> {# select heredará estilo de .form-group select #}
-                    <option value="">-- Selecciona un donante --</option>
+            <!-- Donor Field -->
+            <div class="form-group">  {# Using form-group #}
+                <label for="donor_id">Donor:</label>
+                 {# select will inherit style from .form-group select #}
+                <select name="donor_id" id="donor_id" required> 
+                     <!-- Default option translated -->
+                    <option value="">-- Select a donor --</option>
                     {% for donor in donors %}
                     <option value="{{ donor.id }}">{{ donor.name }} (ID: {{ donor.id }})</option>
                     {% endfor %}
                 </select>
                 {% if not donors and not error_message %}
-                    <small style="display: block; margin-top: 5px;">No hay donantes disponibles. <a href="{{ url_for('donors.add_donor_form') }}">Añadir Donante</a>.</small> {# Mantenemos el enlace útil #}
+                    <!-- Text translated -->
+                    <small style="display: block; margin-top: 5px;">No donors available. <a href="{{ url_for('donors.add_donor_form') }}">Add Donor</a>.</small> {# Kept the useful link #}
                 {% endif %}
             </div>
 
-            <!-- Campo Monto - Corregimos la etiqueta a CHF -->
+            <!-- Amount Field - Label corrected to CHF -->
             <div class="form-group">
-                <label for="amount">Monto (CHF):</label> {# <---- ¡¡CAMBIO A CHF!! #}
-                <input type="number" name="amount" id="amount" step="0.01" min="0.01" required placeholder="Ej: 50.00"> {# input heredará estilo #}
+                <label for="amount">Amount (CHF):</label> {# <---- Label kept as CHF #}
+                 {# input will inherit style #}
+                  <!-- Placeholder translated -->
+                <input type="number" name="amount" id="amount" step="0.01" min="0.01" required placeholder="Ex: 50.00"> 
             </div>
 
-            <!-- Campo Fecha -->
+            <!-- Date Field -->
             <div class="form-group">
-                <label for="donation_date">Fecha de la Donación (Opcional):</label>
-                <input type="date" name="donation_date" id="donation_date"> {# input type=date heredará estilo base #}
-                <small style="display: block; margin-top: 5px;">Dejar vacío para usar la fecha y hora actuales.</small> {# Usamos small para texto auxiliar #}
+                 <!-- Label translated -->
+                <label for="donation_date">Donation Date (Optional):</label>
+                 {# input type=date will inherit base style #}
+                <input type="date" name="donation_date" id="donation_date"> 
+                 <!-- Helper text translated -->
+                 {# Using small for helper text #}
+                <small style="display: block; margin-top: 5px;">Leave empty to use current date and time.</small> 
             </div>
 
-            <!-- Campo Descripción -->
+            <!-- Description Field -->
             <div class="form-group">
-                <label for="description">Descripción / Nota (Opcional):</label>
-                <textarea name="description" id="description" rows="3" placeholder="Ej: Donación para campaña 'Agua Limpia', pago por transferencia..." style="width: 95%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;"></textarea> {# Añadimos estilo inline similar al CSS para consistencia si textarea no está cubierto #}
-                {# Nota: Podrías añadir 'textarea' a la lista de selectores en tu CSS si quieres #}
-                {# .form-group input[type="text"], ..., .form-group select, .form-group textarea { ... } #}
+                 <!-- Label translated -->
+                <label for="description">Description / Note (Optional):</label>
+                 <!-- Placeholder translated -->
+                  {# Added inline style similar to CSS for consistency if textarea not covered #}
+                <textarea name="description" id="description" rows="3" placeholder="Ex: Donation for 'Clean Water' campaign, payment via transfer..." style="width: 95%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;"></textarea> 
+                {# Note: You might add 'textarea' to the selector list in your CSS if desired Translated comment #}
+                {# .form-group input[type="text"], ..., .form-group select, .form-group textarea { ... } Translated comment #}
             </div>
 
-            <!-- Botones de Acción - Usamos .form-actions y .btn como en add_book.html -->
+            <!-- Action Buttons - Using .form-actions and .btn as in add_book.html Translated comment -->
             <div class="form-actions">
-                <button type="submit" class="btn btn-primary">Registrar Donación</button> {# <--- Usar clase btn btn-primary #}
-                {# Usaremos btn para consistencia, puede que necesites añadir ".btn-secondary" o similar en tu CSS si quieres estilo diferente para Cancelar #}
-                <a href="{{ url_for('main.index') }}" class="btn">Cancelar / Volver</a> {# <--- Usar clase btn #}
+                 <!-- Button texts translated -->
+                 {# Using btn btn-primary class #}
+                <button type="submit" class="btn btn-primary">Register Donation</button> 
+                 {# Using btn for consistency, may need ".btn-secondary" or similar in CSS for different Cancel style Translated comment #}
+                <a href="{{ url_for('main.index') }}" class="btn">Cancel / Go Back</a> {# <--- Using btn class #}
             </div>
         </form>
 

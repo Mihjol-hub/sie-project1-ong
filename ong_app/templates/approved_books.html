@@ -1,64 +1,70 @@
+<!-- ong_app/templates/approved_books.html (Translated) -->
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en"> {# Language set to English #}
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Título actualizado -->
-    <title>Preparar Envío de Libros Aprobados</title>
+    <!-- Updated Title translated -->
+    <title>Prepare Shipment of Approved Books</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="container">
-        <!-- Título actualizado -->
-        <h1>Preparar Envío de Lote de Libros</h1>
-        <p>Selecciona los libros aprobados que deseas incluir en el envío y elige el destino.</p>
+        <!-- Updated Header translated -->
+        <h1>Prepare Batch Shipment of Books</h1>
+         <!-- Descriptive text translated -->
+        <p>Select the approved books you wish to include in the shipment and choose the destination.</p>
 
-        <!-- Mensajes Flash y Error -->
+        <!-- Flash and Error Messages (Structure unchanged) -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                  <div class="flash-messages">
                     {% for category, message in messages %}
+                         {# Message comes translated from Flask #}
                         <div class="flash-message flash-{{ category }}">{{ message }}</div>
                     {% endfor %}
                  </div>
             {% endif %}
         {% endwith %}
         {% if error_message %}
-            <p class="error-msg">Error al cargar: {{ error_message }}</p>
+             <!-- Error prefix translated -->
+            <p class="error-msg">Error loading: {{ error_message }}</p>
         {% endif %}
 
-        {# === INICIO DEL FORMULARIO QUE ENVUELVE TODO === #}
-        {# Apuntará a una nueva ruta POST que crearemos: 'create_batch_shipment' #}
+        {# === START OF THE FORM THAT WRAPS EVERYTHING === #}
+        {# It will point to a new POST route we'll create: 'create_batch_shipment' Translated comment #}
         <form action="{{ url_for('books.create_batch_shipment') }}" method="POST">
 
-            <!-- Tabla de Libros Aprobados (Pendientes de Logística) -->
+            <!-- Table of Approved Books (Pending Logistics) Translated comment -->
             {% if books %}
                 <table class="table-standard">
                     <thead>
                         <tr>
-                            {# 1. NUEVA COLUMNA PARA CHECKBOX #}
+                            {# 1. NEW COLUMN FOR CHECKBOX Translated comment #}
+                             <!-- Header translated -->
                             <th style="width: 30px; text-align: center;">Sel.</th>
                             <th>ID</th>
-                            <th>Título</th>
+                            <th>Title</th>
                             <th>ISBN</th>
-                            <th>Notas</th>
-                            {# Quitamos la columna de acciones individuales que teníamos antes #}
+                            <th>Notes</th>
+                            {# Removed the individual actions column we had before Translated comment #}
                         </tr>
                     </thead>
                     <tbody>
                         {% for book in books %}
                         <tr>
-                             {# 1. CELDA CON EL CHECKBOX #}
+                             {# 1. CELL WITH CHECKBOX Translated comment #}
                              <td style="text-align: center;">
-                                 {# El 'name' es importante para recoger la lista en Flask #}
-                                 {# El 'value' será el ID del libro #}
+                                 {# 'name' is important to collect the list in Flask Translated comment #}
+                                 {# 'value' will be the book ID Translated comment #}
                                  <input type="checkbox" name="selected_book_ids" value="{{ book.id }}">
                              </td>
                              <td>{{ book.id }}</td>
                              <td>{{ book.name }}</td>
                              <td>{{ book.default_code if book.default_code else '-' }}</td>
-                             <td>{{ book.description if book.description else '-' }}</td>
-                             {# Ya no hay botón "Listo para Envío" aquí #}
+                              {# Same consistency check as before for description/description_sale #}
+                             <td>{{ book.description_sale if book.description_sale else (book.description if book.description else '-') }}</td>
+                             {# No more "Ready for Shipment" button here Translated comment #}
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -66,36 +72,42 @@
 
                 <hr>
 
-                {# 2. SELECTOR DE DESTINO (FUERA DE LA TABLA, DENTRO DEL FORM) #}
+                {# 2. DESTINATION SELECTOR (OUTSIDE TABLE, INSIDE FORM) Translated comment #}
                 <div class="form-group" style="margin-top: 20px;">
-                    <label for="destination_location_id"><strong>Destino del Envío:</strong></label>
+                     <!-- Label translated -->
+                    <label for="destination_location_id"><strong>Shipment Destination:</strong></label>
                     <select name="destination_location_id" id="destination_location_id" required>
-                        <option value="">-- Selecciona una sucursal --</option>
-                        {# Pasaremos los IDs de las ubicaciones destino desde Flask en el futuro, #}
-                        {# pero por AHORA ponemos los valores directamente aquí. ¡RECUERDA PASARLOS DESDE PYTHON LUEGO! #}
+                         <!-- Default option translated -->
+                        <option value="">-- Select a branch --</option>
+                        {# We'll pass destination location IDs from Flask in the future, Translated comment #}
+                        {# but FOR NOW, we put the values directly here. REMEMBER TO PASS FROM PYTHON LATER! Translated comment #}
                         <option value="29">EC - Quito</option>
                         <option value="34">VEN - Canaima Amazonas</option>
                         <option value="35">VEN - Andes (Tachira)</option>
-                        <option value="32">Sucursal Ginebra (Suiza)</option> {# Añadimos Ginebra como opción #}
-                        {# Añadir más opciones si hay más destinos #}
+                        {# Added Geneva as an option Translated comment #}
+                        <option value="32">Geneva Branch (Switzerland)</option> 
+                        {# Add more options if there are more destinations Translated comment #}
                     </select>
                 </div>
 
-                {# 3. BOTÓN PARA CREAR EL ENVÍO DEL LOTE #}
+                {# 3. BUTTON TO CREATE THE BATCH SHIPMENT Translated comment #}
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary">📦 Crear Envío de Lote Seleccionado</button>
+                     <!-- Button text translated -->
+                    <button type="submit" class="btn btn-primary">📦 Create Selected Batch Shipment</button>
                 </div>
 
             {% elif not error_message %}
-                 <p class="no-items">No hay libros aprobados pendientes de preparar para envío.</p>
+                  <!-- Text translated -->
+                 <p class="no-items">No approved books are pending shipment preparation.</p>
             {% endif %}
 
-            {# Botón volver fuera del if/else, pero dentro del form por si acaso se necesita #}
+            {# Back button outside if/else, but inside form just in case needed Translated comment #}
             <div class="form-actions" style="text-align: left; border-top: none; margin-top: 10px;">
-                 <a href="{{ url_for('main.index') }}" class="btn">Volver a Inicio</a>
+                 <!-- Button text translated -->
+                 <a href="{{ url_for('main.index') }}" class="btn">Back to Home</a>
              </div>
 
-        </form> {# === FIN DEL FORMULARIO === #}
+        </form> {# === END OF FORM === #}
 
     </div>
 </body>

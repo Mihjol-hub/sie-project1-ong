@@ -1,36 +1,41 @@
-<!-- ong_app/templates/rejected_books.html (Ajustado) -->
+<!-- ong_app/templates/rejected_books.html (Adjusted & Translated) -->
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en"> {# Language set to English #}
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Libros Rechazados</title> 
+    <!-- Title translated -->
+    <title>Rejected Books</title> 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="container">
-        <h1>Libros Rechazados</h1> 
+        <!-- Header translated -->
+        <h1>Rejected Books</h1> 
 
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
+                    {# Message comes translated from Flask #}
                     <div class="flash-message flash-{{ category }}">{{ message }}</div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
 
         {% if error_message %}
-            <p class="error-msg">Error al cargar la lista: {{ error_message }}</p>
+             <!-- Error prefix translated -->
+            <p class="error-msg">Error loading list: {{ error_message }}</p>
         {% endif %}
 
         {% if books %}
             <table>
                 <thead>
                     <tr>
-                        <th>ID Odoo</th>
-                        <th>Título</th>
-                        <th>ISBN (Ref. Interna)</th>
-                        <th>Notas (Autor/Donante)</th>
+                         <!-- Table headers translated -->
+                        <th>Odoo ID</th>
+                        <th>Title</th>
+                        <th>ISBN (Internal Ref.)</th>
+                        <th>Notes (Author/Donor)</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -39,19 +44,22 @@
                         <td>{{ book.id }}</td>
                         <td>{{ book.name }}</td>
                         <td>{{ book.default_code if book.default_code else '-' }}</td>
-                        <td>{{ book.description if book.description else '-' }}</td>
+                        {# Consistency check: Use description_sale first if available #}
+                        <td>{{ book.description_sale if book.description_sale else (book.description if book.description else '-') }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         {% elif not error_message %}
-             <p class="no-items">No hay libros rechazados actualmente.</p> 
+              <!-- Text translated -->
+             <p class="no-items">There are currently no rejected books.</p> 
         {% endif %}
 
         <hr>
-        {# Usamos div.form-actions para mantener el estilo del botón de volver #}
+        {# Use div.form-actions to maintain back button style Translated comment #}
         <div class="form-actions" style="text-align: left;">
-            <a href="{{ url_for('main.index') }}" class="btn">Volver a Inicio</a> {# <--- Clase btn añadida #}
+             <!-- Button text translated -->
+            <a href="{{ url_for('main.index') }}" class="btn">Back to Home</a> {# <--- Added btn class #}
         </div>
     </div>
 </body>
