@@ -135,15 +135,10 @@ L'objectif principal était de résoudre le défi concret rencontré par les bé
 Pour arrêter tous les conteneurs en cours d'exécution :
 ```bash
 docker compose down
+```
 
+## Modèles de Processus (AS-IS / TO-BE)
+Les diagrammes de processus illustrant le flux de travail avant (AS-IS) et après (TO-BE) l'implémentation, créés à l'aide de Bonita BPM Community Edition, se trouvent dans les fichiers sources Bonita (.proc): app/diagrams/AS-IS.proc , app/diagrams/TO-BE.proc. sinon il y a aussi une visualisation facile : Référez-vous aux fichiers image (.png) 
 
-
-Modèles de Processus (AS-IS / TO-BE)
-Les diagrammes de processus illustrant le flux de travail avant (AS-IS) et après (TO-BE) l'implémentation, créés à l'aide de Bonita BPM Community Edition, se trouvent dans les fichiers suivants :
-
-Fichiers sources Bonita (.proc) : app/diagrams/AS-IS.proc, app/diagrams/TO-BE.proc (Les noms peuvent varier légèrement)
-Visualisation facile : Référez-vous aux fichiers image (.png) inclus dans votre soumission ou au Rapport.pdf pour une vue graphique des modèles.
-Rapport du Projet
-Le rapport complet détaillant l'analyse, la conception, l'implémentation, les défis et les conclusions du projet est disponible dans le fichier :
-
-Rapport.pdf (Situé à la racine de ce dépôt si vous l'y placez pour la soumission)
+## Rapport du Projet Rapport.pdf 
+Le rapport complet détaillant l'analyse, la conception, l'implémentation, les défis et les conclusions du projet est disponible dans le fichier.
