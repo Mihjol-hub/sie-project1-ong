@@ -15,7 +15,7 @@ services:  # <-- KEY: Defines the services block Translated comment
       - FLASK_APP=ong_app:create_app 
        # Activates dev mode (debug and reloader) Translated comment
       - FLASK_ENV=development        
-       # Use variable from here Translated comment - Note: You might want to change the secret key itself for production
+       
       - SECRET_KEY=my_super_secret_from_compose_123! 
       # Odoo Variables Translated comment
       - ODOO_URL=http://odoo:8069
@@ -44,7 +44,7 @@ services:  # <-- KEY: Defines the services block Translated comment
       - USER=odoo
        # Odoo DB connection password (defined below) Translated comment
       - PASSWORD=odoo_password 
-       # Your saved master password (uncomment if you need to create DBs again) Translated comment
+       
       # - ODOO_MASTER_PASSWORD=3hbh-nbcc-ht99 
     networks:
       # Add it to the custom network Translated comment
